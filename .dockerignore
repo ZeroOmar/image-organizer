@@ -1,14 +1,17 @@
-# VCS
+# Only sources needed to build go into the image context; everything is rebuilt inside.
+
+# VCS / CI
 .git
 .gitignore
+.github
 
-# Docker files themselves
+# Docker files themselves (docker/ is needed: entrypoint + hash-password)
 Dockerfile*
 docker-compose*.yml
 .dockerignore
 
 # Editor / OS
-.DS_Store
+**/.DS_Store
 .idea
 .vscode
 *.swp
@@ -16,41 +19,32 @@ docker-compose*.yml
 # Secrets
 .env
 .env.*
-!.env.example
 *.pem
 *.key
 
-# Dependencies & build output (installed/built inside the image)
-node_modules
-.pnpm-store
-dist
-build
-.next
-.turbo
-__pycache__
-*.py[cod]
-.venv
-venv
+# Dependencies & build output, in every workspace (installed/built inside the image)
+**/node_modules
+**/dist
+**/build
+**/.vite
+**/*.tsbuildinfo
 
-# Tests, coverage, logs
+# Tests, fixtures, coverage, logs
+**/*.test.ts
+apps/server/test
+vitest.config.ts
+fixtures
 coverage
-.nyc_output
-htmlcov
-.pytest_cache
-logs
-*.log
+test-results
+playwright-report
+**/*.log
 
-# Local photo data (mounted as a volume, not baked into the image)
-data
-storage
-uploads
-media
-thumbnails
-cache
-*.sqlite
-*.sqlite3
-*.db
+# Local sandbox and dev tooling
+.local-test
+scripts
 
-# Docs
+# Docs, screenshots and Claude context
 *.md
-!README.md
+docs
+images
+.claude

@@ -16,6 +16,11 @@ desktop.ini
 *.pem
 *.key
 
+# --- Real deployment compose file (holds the password hash + session secret).
+#     docker-compose.example.yml is the committed template. ---
+docker-compose.yml
+docker-compose.override.yml
+
 # --- Logs ---
 logs/
 *.log
@@ -24,47 +29,38 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# --- Node ---
+# --- Node / build output (any workspace) ---
 node_modules/
 .pnpm-store/
 .npm/
-.yarn/*
-!.yarn/releases
 dist/
 build/
-.next/
-.nuxt/
-.svelte-kit/
-.turbo/
 .vite/
 *.tsbuildinfo
 
-# --- Python ---
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-*.egg-info/
-
-# --- Test / coverage ---
+# --- Test / coverage / browser automation ---
 coverage/
 .nyc_output/
-htmlcov/
-.coverage
+test-results/
+playwright-report/
 
-# --- App data (photo storage, never commit user media) ---
+# --- Local test sandbox (scripts/run-local.sh): config, DB, cache, mock media ---
+/.local-test/
+
+# --- App data, if ever run with roots inside the repo (never commit user media) ---
 /data/
 /storage/
 /uploads/
 /media/
+/import/
+/trash/
 /thumbnails/
 /cache/
 *.sqlite
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
 
-# --- Docker ---
-docker-compose.override.yml
+# --- Claude Code: per-user local settings (skills in .claude/skills are committed) ---
+.claude/settings.local.json
