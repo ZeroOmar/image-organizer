@@ -21,6 +21,9 @@ desktop.ini
 docker-compose.yml
 docker-compose.override.yml
 
+# --- Release notes draft (goes into the annotated tag message, not the repo) ---
+notes.md
+
 # --- Logs ---
 logs/
 *.log
