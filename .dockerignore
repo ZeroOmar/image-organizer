@@ -1,0 +1,56 @@
+# VCS
+.git
+.gitignore
+
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Editor / OS
+.DS_Store
+.idea
+.vscode
+*.swp
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies & build output (installed/built inside the image)
+node_modules
+.pnpm-store
+dist
+build
+.next
+.turbo
+__pycache__
+*.py[cod]
+.venv
+venv
+
+# Tests, coverage, logs
+coverage
+.nyc_output
+htmlcov
+.pytest_cache
+logs
+*.log
+
+# Local photo data (mounted as a volume, not baked into the image)
+data
+storage
+uploads
+media
+thumbnails
+cache
+*.sqlite
+*.sqlite3
+*.db
+
+# Docs
+*.md
+!README.md
