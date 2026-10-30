@@ -91,7 +91,9 @@ export function GpsDialog({
     if (!config || !q.trim()) return;
     setSearchErr(null);
     try {
-      const res = await fetch(`${config.nominatimUrl.replace(/\/$/, '')}/search?format=json&limit=8&q=${encodeURIComponent(q)}`);
+      const res = await fetch(`${config.nominatimUrl.replace(/\/$/, '')}/search?format=json&limit=8&q=${encodeURIComponent(q)}`, {
+        referrerPolicy: 'strict-origin-when-cross-origin',
+      });
       setResults(await res.json());
     } catch {
       setSearchErr('Search failed (is the browser online?)');
@@ -153,7 +155,8 @@ export function GpsDialog({
           zoom={point ? 13 : 6}
           style={{ height: '100%' }}
         >
-          <TileLayer url={config.mapTileUrl} attribution={config.mapAttribution} />
+          {/* OSM blocks tile requests without a Referer; pin the policy so a proxy's `Referrer-Policy: no-referrer` can't strip it. */}
+          <TileLayer url={config.mapTileUrl} attribution={config.mapAttribution} referrerPolicy="strict-origin-when-cross-origin" />
           <ClickToPlace onPick={(p) => place(p)} />
           <FlyTo point={fly} />
           {withGps.map((e) => (
