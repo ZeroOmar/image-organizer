@@ -19,8 +19,8 @@ apps/server/       Fastify API. src/
 apps/web/          React + Vite. src/
   theme/           tokens.css (design.md, Nomad green) + app.css (all styles)
   api/             fetch client + react-query hooks + SSE job events
-  organise/        Workspace (resizable panes) shared by Organise & Import, grid, filters, dialogs
-  pages/           Login, Home, Import, Organise, Automation, Immich (TBA), Settings, Trash
+  organize/        Workspace (resizable panes) shared by Organize & Import, grid, filters, dialogs
+  pages/           Login, Home, Import, Organize, Automation, Immich (TBA), Settings, Trash
 apps/app-icon.svg  The logo (single source; Vite emits favicon/PNGs from it)
 fixtures/          Sample media (regenerate: scripts/make-fixtures.sh)
 docker/            entrypoint (PUID/PGID via su-exec), hash-password

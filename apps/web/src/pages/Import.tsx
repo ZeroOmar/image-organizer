@@ -6,8 +6,8 @@ import { uploadFile } from '../api/client';
 import { useConfig, useJobs } from '../api/hooks';
 import { ActionDialog } from '../components/ActionDialog';
 import { FolderPicker } from '../components/FolderPicker';
-import { MoveDialog, TrashDialog } from '../organise/dialogs/SimpleDialogs';
-import { Workspace, type WorkspaceApi } from '../organise/Workspace';
+import { MoveDialog, TrashDialog } from '../organize/dialogs/SimpleDialogs';
+import { Workspace, type WorkspaceApi } from '../organize/Workspace';
 
 interface Upload {
   id: number;
@@ -150,8 +150,8 @@ function AlbumDoneLink({ last }: { last: { jobId: string; rel: string } | null }
   const job = useJobs().data?.find((j) => j.id === last?.jobId);
   if (!last || job?.status !== 'done') return null;
   return (
-    <Link className="btn btn-sm" to={`/organise?path=${encodeURIComponent(last.rel)}`}>
-      Open album in Organise →
+    <Link className="btn btn-sm" to={`/organize?path=${encodeURIComponent(last.rel)}`}>
+      Open album in Organize →
     </Link>
   );
 }

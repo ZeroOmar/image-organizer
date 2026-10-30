@@ -8,7 +8,7 @@ import { HomePage } from './pages/Home';
 import { ImmichPage } from './pages/Immich';
 import { ImportPage } from './pages/Import';
 import { LoginPage } from './pages/Login';
-import { OrganisePage } from './pages/Organise';
+import { OrganizePage } from './pages/Organize';
 import { SettingsPage } from './pages/Settings';
 import { TrashPage } from './pages/Trash';
 
@@ -46,7 +46,9 @@ export function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/import" element={<ImportPage />} />
-          <Route path="/organise" element={<OrganisePage />} />
+          <Route path="/organize" element={<OrganizePage />} />
+          {/* Old British spelling; keeps bookmarks working. */}
+          <Route path="/organise" element={<Navigate to={{ pathname: '/organize', search: location.search }} replace />} />
           <Route path="/automation" element={<AutomationPage />} />
           <Route path="/immich" element={<ImmichPage />} />
           <Route path="/settings" element={<SettingsPage />} />

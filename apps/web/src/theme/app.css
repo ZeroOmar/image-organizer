@@ -433,7 +433,7 @@ input[type='range'] {
   pointer-events: none;
 }
 
-/* ---------- Workspace (Organise / Import) ---------- */
+/* ---------- Workspace (Organize / Import) ---------- */
 .workspace {
   height: calc(100vh - var(--nav-h));
 }

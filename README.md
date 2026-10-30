@@ -4,11 +4,11 @@ Self-hosted photo and video organizer with a web UI. It fixes dates, timezones a
 
 It automates a manual Adobe Bridge workflow: open a folder → check *Date Time Original*, file dates, camera data and GPS → fix what social media stripped → correct the timezone → rename to `YYYYMMDD_HHMMSS[XX]_PIC|VID`.
 
-<p align="center"> <img src="images/organise.png" alt="Organise workspace" width="100%"> </p>
+<p align="center"> <img src="images/organize.png" alt="Organize workspace" width="100%"> </p>
 
 ## Features
 
-- **Organise workspace**: Bridge-style layout with resizable panes: folder tree, filter panel, thumbnail grid, preview and metadata panel. Pane sizes are remembered.
+- **Organize workspace**: Bridge-style layout with resizable panes: folder tree, filter panel, thumbnail grid, preview and metadata panel. Pane sizes are remembered.
 - **Rename by template**: separate photo and video templates, editable in the UI (`{YYYY}{MM}{DD}_{HH}{mm}{ss}{XX}_{TYPE}` by default). Files that share a second are **all** numbered (`…09400401`, `…09400402`, …), unique ones get no counter, and extensions are normalized (`.jpeg`/`.JPG` → `.jpg`).
 - **Dates and timezones**:
   - **Resolved capture date** from a configurable source priority: Date Time Original → Create Date → date in the filename (WhatsApp, Pixel, screenshots…) → file modified date.
@@ -153,7 +153,7 @@ The page also shows the static config read-only, with secrets masked.
 | Path | Purpose |
 |---|---|
 | `/app` | `config.yaml` (merged), `data/app.db` (sessions, settings, metadata cache, jobs/undo, trash index, rules), `cache/thumbs/` |
-| `/media` | Your library. The Organise page works here. |
+| `/media` | Your library. The Organize page works here. |
 | `/import` | Incoming media. Files can be dropped in by other tools or uploaded in the browser. |
 | `/trash` | Deleted files, kept as `/trash/<media\|import>/<original path>` for exact restore. Use a separate mount; moves across devices are copy → verify → unlink. |
 
@@ -177,7 +177,7 @@ The container serves **plain HTTP on port 80**; terminate TLS at your reverse pr
 ### Workflow
 
 1. **Import**: upload files or let them land in `/import`. Select them and choose **Move to album**: pick or create a folder under `/media`, and optionally write resolved dates, rename by template and sync file dates.
-2. **Organise**: open the album. Tiles with problems are outlined; filter by **Issues** to work through them:
+2. **Organize**: open the album. Tiles with problems are outlined; filter by **Issues** to work through them:
    - **Dates & timezone** → *Write resolved date* fixes stripped WhatsApp/social copies (date from the filename, time from the same day).
    - **GPS** sets a location; **Copy metadata** pulls dates, GPS or camera info from a good file.
    - Click any value in the Metadata panel to fix a single tag.
@@ -322,9 +322,9 @@ image-organizer/
 │       └── src/
 │           ├── theme/          # design.md tokens (Nomad green)
 │           ├── api/            # fetch client, react-query hooks, SSE
-│           ├── organise/       # Workspace panes, grid, filters, metadata, dialogs
+│           ├── organize/       # Workspace panes, grid, filters, metadata, dialogs
 │           ├── components/     # Nav, Jobs menu, dialogs, folder tree/picker
-│           └── pages/          # Login, Home, Import, Organise, Automation, Trash, Settings
+│           └── pages/          # Login, Home, Import, Organize, Automation, Trash, Settings
 ├── packages/shared/            # Shared TS: dates/TZ, rename engine, issues, schemas
 ├── docker/                     # entrypoint (PUID/PGID), hash-password
 ├── fixtures/                   # Sample media for tests and local runs

@@ -20,7 +20,7 @@ The Import page's primary action builds this job:
 [applyDates?] → move {dest: media/<album>} → [rename?] → [syncFileDates?]
 ```
 
-The rename runs **after** the move so numbering accounts for files already in the album. The folder picker can create the album folder. When the job finishes, an "Open album in Organise" link appears.
+The rename runs **after** the move so numbering accounts for files already in the album. The folder picker can create the album folder. When the job finishes, an "Open album in Organize" link appears.
 
 Cross-root rule: `move` only allows import → media (or within a root); anything else is an error item in the plan.
 

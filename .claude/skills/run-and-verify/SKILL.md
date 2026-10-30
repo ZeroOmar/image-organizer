@@ -45,8 +45,8 @@ exiftool -j -n -DateTimeOriginal -OffsetTimeOriginal -GPSLatitude .local-test/me
 
 Install Playwright once in a scratch directory (not in the repo): `npm i playwright@1 && npx playwright install chromium`. Then drive the app:
 
-- `page.goto('/')` → fill `#u`/`#p` → click `button[type=submit]` → wait for `text=Organise`.
-- Organise: `/organise?path=Trips/Bikers`, wait for `.tile`. Batch buttons are under `.batchbar` (the filter panel also has a "GPS" heading, so scope your selectors).
+- `page.goto('/')` → fill `#u`/`#p` → click `button[type=submit]` → wait for `text=Organize`.
+- Organize: `/organize?path=Trips/Bikers`, wait for `.tile`. Batch buttons are under `.batchbar` (the filter panel also has a "GPS" heading, so scope your selectors).
 - Dialogs: click "Preview changes" and wait for `table.table` (dry-run table).
 - Collect `console` errors. A single 401 from `/api/auth/me` before login is expected.
 

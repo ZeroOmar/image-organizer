@@ -45,7 +45,7 @@ function useStored<T>(key: string, initial: T): [T, (v: T) => void] {
 }
 
 /**
- * Bridge-style layout shared by Organise and Import: Folders + Filter | Content | Preview + Metadata.
+ * Bridge-style layout shared by Organize and Import: Folders + Filter | Content | Preview + Metadata.
  * Every split is resizable; sizes persist per page in localStorage.
  */
 export function Workspace({

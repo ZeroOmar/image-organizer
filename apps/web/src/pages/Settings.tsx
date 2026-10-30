@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useConfig, useSaveSettings, useSettings } from '../api/hooks';
-import { TokenPalette } from '../organise/dialogs/RenameDialog';
+import { TokenPalette } from '../organize/dialogs/RenameDialog';
 
 export function SettingsPage() {
   const { data } = useSettings();
@@ -234,7 +234,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
         <div className="card stack">
           <label className="check">
             <input type="checkbox" checked={s.issues.enabled} onChange={(e) => set('issues', { ...s.issues, enabled: e.target.checked })} />
-            Highlight files with missing metadata or mismatched dates in Organise and Import
+            Highlight files with missing metadata or mismatched dates in Organize and Import
           </label>
           <div className="grid-2" style={{ opacity: s.issues.enabled ? 1 : 0.5 }}>
             {ISSUE_CHECKS.map((c) => (

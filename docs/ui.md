@@ -15,15 +15,15 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 | Route | Page |
 |---|---|
 | `/login` | `Login` |
-| `/` | `Home`: cards Import (pending count), Organise (green), Automation, Immich (TBA, disabled), Settings |
+| `/` | `Home`: cards Import (pending count), Organize (green), Automation, Immich (TBA, disabled), Settings |
 | `/import` | `Import`: Workspace on root `import` + Upload/drag-drop + Move to album |
-| `/organise?path=` | `Organise`: Workspace on root `media` + batch bar |
+| `/organize?path=` | `Organize`: Workspace on root `media` + batch bar |
 | `/automation` | rules list + editor + dry run |
 | `/trash` | restore / delete / empty |
 | `/settings` | dynamic settings + read-only static config |
 | `/immich` | placeholder |
 
-## Workspace (`src/organise/Workspace.tsx`)
+## Workspace (`src/organize/Workspace.tsx`)
 
 ```
 ┌ Folders (tree) ┬ breadcrumb · toolbar · Subfolders · Sort ┬ Preview  ┐
@@ -40,9 +40,9 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 
 ## Inline metadata editing
 
-Pass `onEditGps` to `Workspace` to enable it (Organise does; Import stays read-only).
+Pass `onEditGps` to `Workspace` to enable it (Organize does; Import stays read-only).
 
-- Click a value in the Metadata panel (`organise/EditableValue.tsx`) to edit it. Enter saves, Esc cancels, and an empty value deletes the tag.
+- Click a value in the Metadata panel (`organize/EditableValue.tsx`) to edit it. Enter saves, Esc cancels, and an empty value deletes the tag.
 - **Summary** edits fixed tags (DateTimeOriginal, OffsetTimeOriginal, CreateDate, video QuickTime/Keys dates, Make, Model, LensModel, XMP Rating/Subject), with format validation.
 - **All tags** edits any tag as `Group:Tag` (family-1 group). The Composite/File/System/ExifTool groups are read-only.
 - Like Bridge, an edit applies to the whole selection when it includes the shown file, otherwise to that file only. It runs as an `editTags` job via `runJobAndWait()`, so it can be undone from the Jobs menu, and ExifTool errors appear under the field (`Metadata.write` throws when a value couldn't be written).
@@ -54,7 +54,7 @@ A file with GPS opens on its position. Otherwise the dialog asks for the browser
 
 ## Batch actions
 
-Every action dialog wraps `components/ActionDialog.tsx`: form → **Preview changes** (`/api/jobs/plan`, `PlanTable`) → **Apply** (`/api/jobs`). Progress, Undo and Dismiss live in the header `JobsMenu` (`components/JobsMenu.tsx`, SSE-fed; dismissals persist in localStorage; running jobs can't be dismissed). Dialogs live in `src/organise/dialogs/`.
+Every action dialog wraps `components/ActionDialog.tsx`: form → **Preview changes** (`/api/jobs/plan`, `PlanTable`) → **Apply** (`/api/jobs`). Progress, Undo and Dismiss live in the header `JobsMenu` (`components/JobsMenu.tsx`, SSE-fed; dismissals persist in localStorage; running jobs can't be dismissed). Dialogs live in `src/organize/dialogs/`.
 
 ## Data hooks (`src/api/hooks.ts`)
 

@@ -28,9 +28,9 @@ export function HomePage() {
             <span aria-hidden>→</span>
           </div>
         </Link>
-        <Link to="/organise" className="home-card nomad">
+        <Link to="/organize" className="home-card nomad">
           <span className="eyebrow">Step 2 · Fix &amp; rename</span>
-          <h2 className="card-title">Organise</h2>
+          <h2 className="card-title">Organize</h2>
           <p className="muted body-sm" style={{ margin: 0 }}>
             Browse folders, fix dates, timezones and GPS, and rename by template.
           </p>

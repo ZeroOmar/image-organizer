@@ -7,7 +7,7 @@ import { Logo } from './Logo';
 
 const LINKS = [
   { to: '/import', label: 'Import' },
-  { to: '/organise', label: 'Organise' },
+  { to: '/organize', label: 'Organize' },
   { to: '/automation', label: 'Automation' },
   { to: '/trash', label: 'Trash' },
   { to: '/settings', label: 'Settings' },

@@ -1,15 +1,15 @@
 import type { EnrichedEntry, FileRef } from '@io/shared';
 import { useState } from 'react';
-import { CopyMetadataDialog } from '../organise/dialogs/CopyMetadataDialog';
-import { DatesDialog } from '../organise/dialogs/DatesDialog';
-import { GpsDialog } from '../organise/dialogs/GpsDialog';
-import { RenameDialog } from '../organise/dialogs/RenameDialog';
-import { EditTagsDialog, MoveDialog, SyncDatesDialog, TrashDialog } from '../organise/dialogs/SimpleDialogs';
-import { Workspace, type WorkspaceApi } from '../organise/Workspace';
+import { CopyMetadataDialog } from '../organize/dialogs/CopyMetadataDialog';
+import { DatesDialog } from '../organize/dialogs/DatesDialog';
+import { GpsDialog } from '../organize/dialogs/GpsDialog';
+import { RenameDialog } from '../organize/dialogs/RenameDialog';
+import { EditTagsDialog, MoveDialog, SyncDatesDialog, TrashDialog } from '../organize/dialogs/SimpleDialogs';
+import { Workspace, type WorkspaceApi } from '../organize/Workspace';
 
 type DialogId = 'rename' | 'dates' | 'gps' | 'copy' | 'tags' | 'sync' | 'move' | 'trash';
 
-export function OrganisePage() {
+export function OrganizePage() {
   const [dialog, setDialog] = useState<DialogId | null>(null);
   // GPS opened from the Metadata panel: targets the shown file (or the selection that includes it).
   const [gpsFor, setGpsFor] = useState<{ files: FileRef[]; focused: EnrichedEntry } | null>(null);

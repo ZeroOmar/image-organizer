@@ -6,7 +6,7 @@ import { keys, useJobs, useRules } from '../api/hooks';
 import { PlanTable } from '../components/ActionDialog';
 import { Dialog } from '../components/Dialog';
 import { FolderPicker } from '../components/FolderPicker';
-import { TimezoneInput } from '../organise/dialogs/DatesDialog';
+import { TimezoneInput } from '../organize/dialogs/DatesDialog';
 
 type Draft = Omit<Rule, 'id' | 'lastRunAt' | 'lastJobId'> & { id?: string };
 
