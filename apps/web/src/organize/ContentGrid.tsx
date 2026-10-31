@@ -1,8 +1,20 @@
 import { formatDisplay, type EnrichedEntry } from '@io/shared';
-import { memo, useCallback, useEffect, useRef, type DragEvent, type MouseEvent } from 'react';
+import { memo, useCallback, useEffect, useRef, type DragEvent, type MouseEvent, type PointerEvent } from 'react';
 import { thumbUrl } from '../api/client';
 
 export type Selection = Set<string>;
+
+/** What the grid reports when a tile (or empty space) is right-clicked or long-pressed. */
+export interface GridMenuRequest {
+  x: number;
+  y: number;
+  rel: string | null;
+  /** Select everything between the last clicked tile and this one; absent when there is no anchor. */
+  selectRange?: () => void;
+}
+
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP = 10;
 
 /** Outline + badge class from the file's issues: mismatch (red) beats missing (yellow); name-only gets a badge. */
 function issueClass(e: EnrichedEntry, highlight: boolean) {
@@ -21,6 +33,7 @@ export function ContentGrid({
   size,
   highlight,
   onDropFiles,
+  onMenu,
   empty,
 }: {
   entries: EnrichedEntry[];
@@ -31,19 +44,41 @@ export function ContentGrid({
   size: number;
   highlight: boolean;
   onDropFiles?: (files: File[]) => void;
+  onMenu?: (req: GridMenuRequest) => void;
   empty: string;
 }) {
   const anchor = useRef<string | null>(null);
   const area = useRef<HTMLDivElement>(null);
+  // Pointer type of the last press: touch taps toggle tiles (like Cmd/Ctrl-click) so a tablet can multi-select.
+  const pointer = useRef<string>('mouse');
+  const press = useRef<{ timer: number; x: number; y: number } | null>(null);
+  const longPressed = useRef(false);
+
+  const selectRange = useCallback(
+    (rel: string, base: Selection) => {
+      const order = entries.map((x) => x.rel);
+      const [a, b] = [order.indexOf(anchor.current!), order.indexOf(rel)].sort((x, y) => x - y);
+      const next = new Set(base);
+      if (a >= 0) for (const r of order.slice(a, b + 1)) next.add(r);
+      onSelection(next);
+    },
+    [entries, onSelection],
+  );
 
   const click = useCallback(
     (e: MouseEvent, rel: string) => {
-      const order = entries.map((x) => x.rel);
-      if (e.shiftKey && anchor.current) {
-        const [a, b] = [order.indexOf(anchor.current), order.indexOf(rel)].sort((x, y) => x - y);
-        const next = new Set(e.metaKey || e.ctrlKey ? selection : []);
-        for (const r of order.slice(a, b + 1)) next.add(r);
+      if (longPressed.current) {
+        longPressed.current = false;
+        return;
+      }
+      if (pointer.current === 'touch' && !e.shiftKey) {
+        const next = new Set(selection);
+        if (next.has(rel)) next.delete(rel);
+        else next.add(rel);
         onSelection(next);
+        anchor.current = rel;
+      } else if (e.shiftKey && anchor.current) {
+        selectRange(rel, e.metaKey || e.ctrlKey ? selection : new Set());
       } else if (e.metaKey || e.ctrlKey) {
         const next = new Set(selection);
         if (next.has(rel)) next.delete(rel);
@@ -56,8 +91,61 @@ export function ContentGrid({
       }
       onFocus(rel);
     },
-    [entries, selection, onSelection, onFocus],
+    [selection, onSelection, onFocus, selectRange],
   );
+
+  // Right-click / long-press: a tile outside the selection becomes the selection (mouse, like Finder)
+  // or joins it (touch, so a selection built by tapping survives).
+  const openMenu = (x: number, y: number, rel: string | null, touch: boolean) => {
+    if (!onMenu) return;
+    let base = selection;
+    if (rel && !selection.has(rel)) {
+      base = touch ? new Set([...selection, rel]) : new Set([rel]);
+      onSelection(base);
+    }
+    if (rel) onFocus(rel);
+    const from = anchor.current;
+    onMenu({
+      x,
+      y,
+      rel,
+      selectRange: rel && from && from !== rel && entries.some((e) => e.rel === from) ? () => selectRange(rel, base) : undefined,
+    });
+    if (rel) anchor.current = rel;
+  };
+  const openMenuRef = useRef(openMenu);
+  openMenuRef.current = openMenu;
+
+  const tileAt = (target: EventTarget | null) => (target as HTMLElement | null)?.closest<HTMLElement>('[data-rel]')?.dataset.rel ?? null;
+
+  const cancelPress = () => {
+    if (press.current) window.clearTimeout(press.current.timer);
+    press.current = null;
+  };
+  useEffect(() => cancelPress, []);
+
+  const onPointerDown = (e: PointerEvent) => {
+    pointer.current = e.pointerType;
+    longPressed.current = false;
+    cancelPress();
+    if (e.pointerType !== 'touch' || !onMenu) return;
+    const rel = tileAt(e.target);
+    if (!rel) return;
+    const { clientX: x, clientY: y } = e;
+    press.current = {
+      x,
+      y,
+      timer: window.setTimeout(() => {
+        press.current = null;
+        longPressed.current = true;
+        openMenuRef.current(x, y, rel, true);
+      }, LONG_PRESS_MS),
+    };
+  };
+  const onPointerMove = (e: PointerEvent) => {
+    const p = press.current;
+    if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > LONG_PRESS_SLOP) cancelPress();
+  };
 
   // Keyboard: Cmd/Ctrl+A select all, Esc clear, arrows move focus.
   useEffect(() => {
@@ -97,7 +185,19 @@ export function ContentGrid({
       ref={area}
       tabIndex={0}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onSelection(new Set());
+        // On touch, a tap between tiles would too easily wipe a hand-built selection; use "Clear" instead.
+        if (e.target === e.currentTarget && pointer.current !== 'touch') onSelection(new Set());
+      }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={cancelPress}
+      onPointerCancel={cancelPress}
+      onContextMenu={(e) => {
+        if (!onMenu) return;
+        e.preventDefault();
+        // Touch long-press is handled by our own timer (iOS never fires contextmenu, Android does).
+        if (pointer.current === 'touch') return;
+        openMenu(e.clientX, e.clientY, tileAt(e.target), false);
       }}
       onDragOver={(e) => drag(e, true)}
       onDragLeave={(e) => drag(e, false)}

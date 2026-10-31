@@ -5,7 +5,7 @@ import { DatesDialog } from '../organize/dialogs/DatesDialog';
 import { GpsDialog } from '../organize/dialogs/GpsDialog';
 import { RenameDialog } from '../organize/dialogs/RenameDialog';
 import { EditTagsDialog, MoveDialog, SyncDatesDialog, TrashDialog } from '../organize/dialogs/SimpleDialogs';
-import { Workspace, type WorkspaceApi } from '../organize/Workspace';
+import { actionButtons, Workspace, type BatchAction, type WorkspaceApi } from '../organize/Workspace';
 
 type DialogId = 'rename' | 'dates' | 'gps' | 'copy' | 'tags' | 'sync' | 'move' | 'trash';
 
@@ -15,26 +15,28 @@ export function OrganizePage() {
   const [gpsFor, setGpsFor] = useState<{ files: FileRef[]; focused: EnrichedEntry } | null>(null);
   const close = () => setDialog(null);
 
+  const actions = (): BatchAction[] => {
+    const a = (id: DialogId, label: string, extra?: Partial<BatchAction>): BatchAction => ({ label, run: () => setDialog(id), ...extra });
+    return [
+      a('rename', 'Rename', { variant: 'primary' }),
+      a('dates', 'Dates & timezone'),
+      a('gps', 'GPS'),
+      a('copy', 'Copy metadata', { min: 2 }),
+      a('tags', 'Edit tags'),
+      a('sync', 'Sync file dates'),
+      a('move', 'Move'),
+      a('trash', 'Trash', { variant: 'danger' }),
+    ];
+  };
+
   const bar = (w: WorkspaceApi) => {
     const n = w.selected.length;
-    const b = (id: DialogId, label: string, cls = 'btn btn-sm', min = 1) => (
-      <button className={cls} disabled={n < min} onClick={() => setDialog(id)}>
-        {label}
-      </button>
-    );
     return (
       <>
         <span className="eyebrow" style={{ marginRight: 6 }}>
           {n ? `${n} selected` : 'Select files'}
         </span>
-        {b('rename', 'Rename', 'btn btn-sm btn-primary')}
-        {b('dates', 'Dates & timezone')}
-        {b('gps', 'GPS')}
-        {b('copy', 'Copy metadata', 'btn btn-sm', 2)}
-        {b('tags', 'Edit tags')}
-        {b('sync', 'Sync file dates')}
-        {b('move', 'Move')}
-        {b('trash', 'Trash', 'btn btn-sm btn-danger')}
+        {actionButtons(actions(), n)}
         {dialog && <Dialogs id={dialog} w={w} onClose={close} />}
         {gpsFor && (
           <GpsDialog selection={{ files: gpsFor.files }} focused={gpsFor.focused} entries={w.entries} onClose={() => setGpsFor(null)} />
@@ -48,10 +50,11 @@ export function OrganizePage() {
       root="media"
       rootLabel="media"
       batchBar={bar}
+      actions={actions}
       emptyText="This folder has no photos or videos."
       onEditGps={(files, focused) => setGpsFor({ files, focused })}
     />
-  );;
+  );
 }
 
 function Dialogs({ id, w, onClose }: { id: DialogId; w: WorkspaceApi; onClose: () => void }) {

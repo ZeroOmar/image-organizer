@@ -633,9 +633,15 @@ input[type='range'] {
   content-visibility: auto;
   contain-intrinsic-size: auto 220px;
   user-select: none;
+  -webkit-user-select: none;
+  /* No iOS image callout on long-press: that opens our context menu instead. */
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
-.tile:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .tile:hover {
+    background: var(--surface-2);
+  }
 }
 .tile.selected {
   background: var(--surface-2);
@@ -937,6 +943,68 @@ table.table {
 }
 .search-results button:hover {
   background: var(--surface-2);
+}
+
+/* Context menu (tiles) */
+.context-menu {
+  position: fixed;
+  z-index: 70;
+  min-width: 200px;
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: var(--s-xxs);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+.context-menu-title {
+  padding: 6px 10px 4px;
+}
+.context-menu button {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font: 500 13px var(--font);
+  text-align: left;
+  cursor: pointer;
+}
+.context-menu button:hover:not(:disabled),
+.context-menu button:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+.context-menu button:disabled {
+  color: var(--ink-subtle);
+  cursor: not-allowed;
+}
+.context-menu button.danger {
+  color: #ff8a80;
+}
+.context-menu-sep {
+  height: 1px;
+  margin: var(--s-xxs) 0;
+  background: var(--hairline-soft);
+}
+@media (pointer: coarse) {
+  .context-menu button {
+    padding: 11px 12px;
+    font-size: 15px;
+  }
+}
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  cursor: pointer;
+}
+.link-btn:hover {
+  text-decoration: underline;
 }
 
 /* Jobs menu (header) */

@@ -40,7 +40,8 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY docker/hash-password /usr/local/bin/hash-password
 RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/hash-password \
     && mkdir -p /media /trash /import \
-    && chmod 777 /media /trash /import
+    && chmod 777 /media /trash /import \
+    && rm -rf /media/*
 
 ENV NODE_ENV=production \
     APP_VERSION=${APP_VERSION} \

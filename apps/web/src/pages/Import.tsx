@@ -7,7 +7,7 @@ import { useConfig, useJobs } from '../api/hooks';
 import { ActionDialog } from '../components/ActionDialog';
 import { FolderPicker } from '../components/FolderPicker';
 import { MoveDialog, TrashDialog } from '../organize/dialogs/SimpleDialogs';
-import { Workspace, type WorkspaceApi } from '../organize/Workspace';
+import { actionButtons, Workspace, type BatchAction, type WorkspaceApi } from '../organize/Workspace';
 
 interface Upload {
   id: number;
@@ -88,6 +88,12 @@ export function ImportPage() {
     );
   };
 
+  const actions = (): BatchAction[] => [
+    { label: 'Move to album', run: () => setDialog('album'), variant: 'primary' },
+    { label: 'Move within import', run: () => setDialog('move') },
+    { label: 'Trash', run: () => setDialog('trash'), variant: 'danger' },
+  ];
+
   const bar = (w: WorkspaceApi) => {
     const n = w.selected.length;
     return (
@@ -95,15 +101,7 @@ export function ImportPage() {
         <span className="eyebrow" style={{ marginRight: 6 }}>
           {n ? `${n} selected` : 'Select files, or drop files here to upload'}
         </span>
-        <button className="btn btn-sm btn-primary" disabled={!n} onClick={() => setDialog('album')}>
-          Move to album
-        </button>
-        <button className="btn btn-sm" disabled={!n} onClick={() => setDialog('move')}>
-          Move within import
-        </button>
-        <button className="btn btn-sm btn-danger" disabled={!n} onClick={() => setDialog('trash')}>
-          Trash
-        </button>
+        {actionButtons(actions(), n)}
         <span className="grow" />
         {active.length > 0 && (
           <span className="caption muted">
@@ -140,6 +138,7 @@ export function ImportPage() {
       rootLabel="import"
       toolbar={toolbar}
       batchBar={bar}
+      actions={actions}
       onDropFiles={(folder, files) => void startUploads(folder, files)}
       emptyText="Nothing to import. Upload files or drop them here — files added to the /import mount show up too."
     />

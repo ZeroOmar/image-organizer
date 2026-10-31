@@ -3,8 +3,9 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
 import { useSearchParams } from 'react-router-dom';
 import { runJobAndWait, useFolder, useSettings } from '../api/hooks';
+import { ContextMenu, type MenuItem } from '../components/ContextMenu';
 import { FolderTree } from '../components/FolderTree';
-import { ContentGrid, type Selection } from './ContentGrid';
+import { ContentGrid, type GridMenuRequest, type Selection } from './ContentGrid';
 import { FilterPanel } from './FilterPanel';
 import { applyFilters, sortEntries, type FilterState, type SortKey } from './filters';
 import { MetadataPanel, type MetadataEditing } from './MetadataPanel';
@@ -18,6 +19,28 @@ export interface WorkspaceApi {
   selected: EnrichedEntry[];
   selection: { files: FileRef[] };
   focused: EnrichedEntry | null;
+}
+
+/** A batch action, rendered both as a BatchBar button (via `actionButtons`) and as a context-menu item. */
+export interface BatchAction {
+  label: string;
+  run: () => void;
+  variant?: 'primary' | 'danger';
+  /** Minimum number of selected files (default 1). */
+  min?: number;
+}
+
+export function actionButtons(actions: BatchAction[], selected: number) {
+  return actions.map((a) => (
+    <button
+      key={a.label}
+      className={`btn btn-sm ${a.variant ? `btn-${a.variant}` : ''}`}
+      disabled={selected < (a.min ?? 1)}
+      onClick={a.run}
+    >
+      {a.label}
+    </button>
+  ));
 }
 
 const LS = typeof window !== 'undefined' ? window.localStorage : undefined;
@@ -53,6 +76,7 @@ export function Workspace({
   rootLabel,
   toolbar,
   batchBar,
+  actions,
   onDropFiles,
   emptyText,
   onEditGps,
@@ -61,6 +85,8 @@ export function Workspace({
   rootLabel: string;
   toolbar?: (api: WorkspaceApi) => ReactNode;
   batchBar: (api: WorkspaceApi) => ReactNode;
+  /** Batch actions for the right-click / long-press menu on tiles (same list the BatchBar shows). */
+  actions?: (api: WorkspaceApi) => BatchAction[];
   onDropFiles?: (folder: string, files: File[]) => void;
   emptyText: string;
   /** Enables inline editing in the Metadata panel; called for "Add location / Edit on map". */
@@ -76,6 +102,7 @@ export function Workspace({
   const [focusedRel, setFocusedRel] = useState<string | null>(null);
   const [leftTab] = useState<'folders'>('folders');
   const [metaTab, setMetaTab] = useState<'summary' | 'all'>('summary');
+  const [menu, setMenu] = useState<GridMenuRequest | null>(null);
 
   const settings = useSettings().data;
   const listing = useFolder(root, folder, recursive);
@@ -123,6 +150,18 @@ export function Workspace({
           },
         }
       : undefined;
+
+  const menuItems = (req: GridMenuRequest): MenuItem[] => [
+    ...(actions?.(api) ?? []).map((a) => ({
+      label: a.label,
+      onSelect: a.run,
+      disabled: selected.length < (a.min ?? 1),
+      danger: a.variant === 'danger',
+    })),
+    { label: 'Select all', onSelect: () => setSelection(new Set(visible.map((e) => e.rel))), separator: true },
+    ...(req.selectRange ? [{ label: 'Select range to here', onSelect: req.selectRange }] : []),
+    { label: 'Clear selection', onSelect: () => setSelection(new Set()), disabled: selection.size === 0 },
+  ];
 
   const h = useDefaultLayout({ id: `io-${root}-h`, storage: localStorage });
   const l = useDefaultLayout({ id: `io-${root}-left`, storage: localStorage });
@@ -205,7 +244,17 @@ export function Workspace({
                 size={size}
                 highlight={highlight}
                 onDropFiles={onDropFiles ? (files) => onDropFiles(folder, files) : undefined}
+                onMenu={actions ? setMenu : undefined}
                 empty={listing.isLoading ? 'Reading metadata…' : entries.length ? 'No files match the filters.' : emptyText}
+              />
+            )}
+            {menu && (
+              <ContextMenu
+                x={menu.x}
+                y={menu.y}
+                title={selected.length ? `${selected.length} selected` : undefined}
+                items={menuItems(menu)}
+                onClose={() => setMenu(null)}
               />
             )}
             <div className="batchbar">{batchBar(api)}</div>
@@ -215,6 +264,16 @@ export function Workspace({
                 {visible.length !== entries.length && ` (${entries.length - visible.length} hidden)`}
                 {selected.length > 0 && `, ${selected.length} selected`}
               </span>
+              {visible.length > 0 && selected.length < visible.length && (
+                <button className="link-btn" onClick={() => setSelection(new Set(visible.map((e) => e.rel)))}>
+                  Select all
+                </button>
+              )}
+              {selection.size > 0 && (
+                <button className="link-btn" onClick={() => setSelection(new Set())}>
+                  Clear
+                </button>
+              )}
               {highlight && issueCount > 0 && <span className="warning-text">{issueCount} with issues</span>}
               {listing.isFetching && <span className="subtle">Refreshing…</span>}
               <span className="grow" />

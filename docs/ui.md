@@ -34,7 +34,9 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 ```
 
 - Every split is a `Group`/`Panel`/`Separator`; layouts persist with `useDefaultLayout({id, storage: localStorage})` per root.
-- The current folder lives in the URL (`?path=`). Selection: click, Cmd/Ctrl-click, Shift-click, Cmd+A, Esc, arrow keys.
+- The current folder lives in the URL (`?path=`). Selection: click, Cmd/Ctrl-click, Shift-click, Cmd+A, Esc, arrow keys, and "Select all" / "Clear" in the status bar.
+- Touch (tablets): a tap toggles a tile in the selection (like Cmd-click), and a tap on empty space doesn't clear it. A long-press opens the context menu.
+- Context menu (`components/ContextMenu.tsx`): right-click or long-press a tile. It lists the page's batch actions, then Select all, Select range to here and Clear selection. A tile outside the selection replaces it (mouse) or joins it (touch). Pages pass `actions(api)` (a `BatchAction[]`) to `Workspace` and render the BatchBar buttons from the same list with `actionButtons()`, so the bar and the menu stay in sync.
 - Filters (`filters.ts`) are computed client-side from the listing: OR within a facet, AND across facets.
 - The page passes `batchBar(api)` (and optionally `toolbar(api)`) render props; `WorkspaceApi` gives `selected`, `selection` (FileRefs), `focused`, `entries`, `folder`.
 
