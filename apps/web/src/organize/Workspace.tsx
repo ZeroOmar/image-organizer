@@ -10,6 +10,7 @@ import { FilterPanel } from './FilterPanel';
 import { applyFilters, sortEntries, type FilterState, type SortKey } from './filters';
 import { MetadataPanel, type MetadataEditing } from './MetadataPanel';
 import { PreviewPane } from './PreviewPane';
+import { useSelectClick, type PickModifiers } from './useSelectClick';
 
 export interface WorkspaceApi {
   root: RootName;
@@ -19,6 +20,12 @@ export interface WorkspaceApi {
   selected: EnrichedEntry[];
   selection: { files: FileRef[] };
   focused: EnrichedEntry | null;
+  /** Selected rels (including files hidden by filters). */
+  selectedRels: Selection;
+  setSelection: (s: Selection) => void;
+  focusRel: (rel: string | null) => void;
+  /** Click-select a file like the grid does (modifiers, touch toggle); for custom panes. */
+  pick: (rel: string, m?: PickModifiers) => void;
 }
 
 /** A batch action, rendered both as a BatchBar button (via `actionButtons`) and as a context-menu item. */
@@ -80,6 +87,8 @@ export function Workspace({
   onDropFiles,
   emptyText,
   onEditGps,
+  content,
+  sidePane,
 }: {
   root: RootName;
   rootLabel: string;
@@ -91,6 +100,10 @@ export function Workspace({
   emptyText: string;
   /** Enables inline editing in the Metadata panel; called for "Add location / Edit on map". */
   onEditGps?: (targets: FileRef[], focused: EnrichedEntry) => void;
+  /** Replaces the thumbnail grid in the center pane. */
+  content?: (api: WorkspaceApi) => ReactNode;
+  /** Replaces the Filter pane under the folder tree. */
+  sidePane?: { label: string; render: (api: WorkspaceApi) => ReactNode };
 }) {
   const [params, setParams] = useSearchParams();
   const folder = params.get('path') ?? '';
@@ -114,8 +127,17 @@ export function Workspace({
   const issueCount = entries.filter((e) => e.issues.length).length;
   const highlight = settings?.issues.enabled ?? true;
 
+  const order = useMemo(() => visible.map((e) => e.rel), [visible]);
+  const { pick } = useSelectClick({ order, selection, onSelection: setSelection, onFocus: setFocusedRel });
+
   const go = (rel: string) => {
-    setParams(rel ? { path: rel } : {});
+    // Keep other params (e.g. the GPS page's ?root=).
+    setParams((p) => {
+      const next = new URLSearchParams(p);
+      if (rel) next.set('path', rel);
+      else next.delete('path');
+      return next;
+    });
     setSelection(new Set());
     setFocusedRel(null);
   };
@@ -128,6 +150,10 @@ export function Workspace({
     selected,
     selection: { files: selected.map((e) => ({ root: e.root, rel: e.rel })) },
     focused,
+    selectedRels: selection,
+    setSelection,
+    focusRel: setFocusedRel,
+    pick,
   };
 
   // Like Bridge: edits in the Metadata panel apply to the whole selection when it includes the shown file.
@@ -187,10 +213,10 @@ export function Workspace({
             <Panel id="filter" minSize="80px">
               <div className="pane">
                 <div className="pane-head">
-                  <button className="tab active">Filter</button>
+                  <button className="tab active">{sidePane?.label ?? 'Filter'}</button>
                 </div>
                 <div className="pane-body">
-                  <FilterPanel entries={entries} state={filters} onChange={setFilters} />
+                  {sidePane ? sidePane.render(api) : <FilterPanel entries={entries} state={filters} onChange={setFilters} />}
                 </div>
               </div>
             </Panel>
@@ -234,6 +260,8 @@ export function Workspace({
             </div>
             {listing.error ? (
               <div className="empty error-text">{(listing.error as Error).message}</div>
+            ) : content ? (
+              content(api)
             ) : (
               <ContentGrid
                 entries={visible}

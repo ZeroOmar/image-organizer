@@ -160,6 +160,21 @@ describe('jobs', () => {
     expect(exif(media(rel), 'GPSLatitude').GPSLatitude).toBeCloseTo(31.2001, 4);
   });
 
+  it('tightens a GPS cluster toward a center, skipping files already there, then undoes', async () => {
+    const files = ['IMG_0001.jpg', 'burst_a.jpg', 'DSC_0420.jpg'].map((f) => ({ root: 'media' as const, rel: `Trips/Bikers/${f}` }));
+    const step = { type: 'gatherGps' as const, lat: 30.0444, lon: 31.2357, scale: 0.5 };
+    const plan = await api<PlanResult>('POST', '/api/jobs/plan', { selection: { files }, steps: [step] });
+    // burst_a sits on the center and DSC_0420 has no GPS: only IMG_0001 moves.
+    expect(plan.items.map((i) => i.file.rel)).toEqual(['Trips/Bikers/IMG_0001.jpg']);
+    const job = await runJob({ selection: { files }, steps: [step] });
+    expect(job.errors).toEqual([]);
+    const moved = exif(media('Trips/Bikers/IMG_0001.jpg'), 'GPSLatitude', 'GPSLongitude');
+    expect(moved.GPSLatitude).toBeCloseTo((31.2001 + 30.0444) / 2, 4);
+    expect(moved.GPSLongitude).toBeCloseTo((29.9187 + 31.2357) / 2, 4);
+    await waitJob((await api<JobInfo>('POST', `/api/jobs/${job.id}/undo`)).id);
+    expect(exif(media('Trips/Bikers/IMG_0001.jpg'), 'GPSLatitude').GPSLatitude).toBeCloseTo(31.2001, 4);
+  });
+
   it('edits group-qualified tags from the All tags panel and undoes them', async () => {
     const rel = 'Trips/Bikers/DSC_0420.jpg';
     const job = await runJob({

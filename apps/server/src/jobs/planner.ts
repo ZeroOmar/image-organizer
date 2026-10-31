@@ -1,6 +1,7 @@
 import {
   COPY_GROUPS,
   STEP_INFO,
+  gatherPoint,
   baseOf,
   formatDisplay,
   formatExifDate,
@@ -222,6 +223,19 @@ async function planStep(step: number, s: Step, files: VFile[], plan: Plan, d: Pl
         plan.ops.push({ op: 'writeTags', step, file: { ...v.cur }, tags, numeric, snapshot: gpsSnapshotTags(kind) });
         const g = v.entry.meta.gps;
         item(v, { before: g ? `${g.lat.toFixed(5)}, ${g.lon.toFixed(5)}` : '—', after: point ? `${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}` : '—' });
+        v.entry = { ...v.entry, meta: { ...v.entry.meta, gps: point }, gpsTz: tzForGps(point) };
+      }
+      return;
+
+    case 'gatherGps':
+      for (const v of files) {
+        const g = v.entry.meta.gps;
+        if (!g) continue;
+        const point = gatherPoint(g, s, s.scale);
+        if (point.lat === g.lat && point.lon === g.lon) continue;
+        const { tags, numeric } = gpsTags(v.entry.kind, point);
+        plan.ops.push({ op: 'writeTags', step, file: { ...v.cur }, tags, numeric, snapshot: gpsSnapshotTags(v.entry.kind) });
+        item(v, { before: `${g.lat.toFixed(5)}, ${g.lon.toFixed(5)}`, after: `${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}` });
         v.entry = { ...v.entry, meta: { ...v.entry.meta, gps: point }, gpsTz: tzForGps(point) };
       }
       return;

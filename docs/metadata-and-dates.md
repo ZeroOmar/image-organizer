@@ -42,6 +42,7 @@ The result carries `local`, `tz`, `offset`, `utcMs`, `source`, `tzSource` and `t
 - **Dates, videos**: QuickTime Create/Modify, Track*, Media* dates in **UTC** + `Keys:CreationDate` local with offset.
 - **GPS, photos**: `GPSLatitude`/`GPSLongitude` as signed decimals, **not** `-n` (exiftool-vendored derives the refs and writes GPSPosition "lat,lon", which `-n` rejects and silently drops lat/lon). Altitude uses abs + `Above/Below Sea Level`.
 - **GPS, videos**: `Keys:GPSCoordinates` + `UserData:GPSCoordinates` = `"lat lon alt"` with `-n`.
+- `setGps` and `gatherGps` (tighten a cluster, from the GPS page) both write through `gpsTags()`. `gatherGps` computes each new point with the shared `gatherPoint()` and keeps the file's altitude.
 - All writes use `-overwrite_original -P`. File mtime is preserved; "Sync file dates" sets it explicitly.
 
 ## Undo snapshots

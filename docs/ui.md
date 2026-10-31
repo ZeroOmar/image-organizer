@@ -18,6 +18,7 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 | `/` | `Home`: cards Import (pending count), Organize (green), Automation, Immich (TBA, disabled), Settings |
 | `/import` | `Import`: Workspace on root `import` + Upload/drag-drop + Move to album |
 | `/organize?path=` | `Organize`: Workspace on root `media` + batch bar |
+| `/gps?root=&path=` | `Gps`: Workspace with a file list + map (root `media`, or `import` with `?root=import`) |
 | `/automation` | rules list + editor + dry run |
 | `/trash` | restore / delete / empty |
 | `/settings` | dynamic settings + read-only static config |
@@ -49,6 +50,18 @@ Pass `onEditGps` to `Workspace` to enable it (Organize does; Import stays read-o
 - **All tags** edits any tag as `Group:Tag` (family-1 group). The Composite/File/System/ExifTool groups are read-only.
 - Like Bridge, an edit applies to the whole selection when it includes the shown file, otherwise to that file only. It runs as an `editTags` job via `runJobAndWait()`, so it can be undone from the Jobs menu, and ExifTool errors appear under the field (`Metadata.write` throws when a value couldn't be written).
 - GPS uses the map dialog ("Add location" / "Edit on map").
+
+## GPS page (`src/pages/Gps.tsx`, `src/gps/`)
+
+Uses the same `Workspace`, with two of its panes swapped out: `sidePane` puts the **Files** list (`FileList.tsx`) where the Filter pane is, and `content` puts the map (`GpsMap.tsx`) where the grid is. The pages share selection through `WorkspaceApi.pick/setSelection/focusRel`, which use `organize/useSelectClick.ts`, the same click rules the grid uses, touch toggling included. A **Media | Import** switch in the toolbar sets `?root=`.
+
+- **Files**: All / No GPS / With GPS. Rows click-select, scroll into view when their marker is picked, and can be dragged onto the map.
+- **Map**: one marker per geotagged file, zoomed to fit once per folder (and on **Fit**). Marker colors come from `tokens.css`. Clicking a marker selects the file, and the list and Preview follow.
+- **Select / Place / Circle** modes:
+  - **Place**: click the map (or drop a list row on it) to drop a draggable pin for the selected files, then **Apply** runs `setGps`.
+  - **Circle**: press-and-drag (mouse or touch) to draw a circle, and the geotagged files inside are selected (Shift adds). **Tighten** previews the new positions (yellow) and **Apply** runs `gatherGps` toward their average or the circle center.
+- Map applies run through `runJobAndWait()` right away, without a dry-run table, and can be undone from the Jobs menu. The batch bar's **Set GPS…**, **Tighten…** and **Clear GPS** use the usual `ActionDialog` dry run.
+- Place search (Nominatim) is `components/PlaceSearch.tsx`, which the GPS dialog uses too.
 
 ## Copy metadata dialog
 

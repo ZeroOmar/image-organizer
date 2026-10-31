@@ -47,6 +47,13 @@ export const StepSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('clearGps') }),
   z.object({
+    type: z.literal('gatherGps'),
+    lat: z.number().min(-90).max(90),
+    lon: z.number().min(-180).max(180),
+    /** Fraction of each file's distance to the center it keeps: 0 = all on the center, 1 = unchanged. */
+    scale: z.number().min(0).max(1),
+  }),
+  z.object({
     type: z.literal('copyMetadata'),
     source: FileRefSchema,
     groups: z.array(z.string()).default([]),
@@ -69,6 +76,7 @@ export const STEP_INFO: Record<StepType, { label: string; description: string; a
   syncFileDates: { label: 'Sync file dates', description: 'Set file modified date to the capture date', automation: true },
   setGps: { label: 'Set GPS', description: 'Write a GPS position', automation: true },
   clearGps: { label: 'Clear GPS', description: 'Remove GPS tags', automation: true },
+  gatherGps: { label: 'Tighten GPS cluster', description: 'Pull GPS positions toward a center point, keeping their layout', automation: false },
   copyMetadata: { label: 'Copy metadata', description: 'Copy selected tags from one file', automation: false },
   editTags: { label: 'Edit tags', description: 'Write tag values', automation: false },
   move: { label: 'Move', description: 'Move files to a folder', automation: true },

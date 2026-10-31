@@ -1,8 +1,9 @@
 import { formatDisplay, type EnrichedEntry } from '@io/shared';
-import { memo, useCallback, useEffect, useRef, type DragEvent, type MouseEvent, type PointerEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, type DragEvent, type MouseEvent, type PointerEvent } from 'react';
 import { thumbUrl } from '../api/client';
+import { useSelectClick, type Selection } from './useSelectClick';
 
-export type Selection = Set<string>;
+export type { Selection };
 
 /** What the grid reports when a tile (or empty space) is right-clicked or long-pressed. */
 export interface GridMenuRequest {
@@ -47,23 +48,13 @@ export function ContentGrid({
   onMenu?: (req: GridMenuRequest) => void;
   empty: string;
 }) {
-  const anchor = useRef<string | null>(null);
   const area = useRef<HTMLDivElement>(null);
   // Pointer type of the last press: touch taps toggle tiles (like Cmd/Ctrl-click) so a tablet can multi-select.
   const pointer = useRef<string>('mouse');
   const press = useRef<{ timer: number; x: number; y: number } | null>(null);
   const longPressed = useRef(false);
-
-  const selectRange = useCallback(
-    (rel: string, base: Selection) => {
-      const order = entries.map((x) => x.rel);
-      const [a, b] = [order.indexOf(anchor.current!), order.indexOf(rel)].sort((x, y) => x - y);
-      const next = new Set(base);
-      if (a >= 0) for (const r of order.slice(a, b + 1)) next.add(r);
-      onSelection(next);
-    },
-    [entries, onSelection],
-  );
+  const order = useMemo(() => entries.map((x) => x.rel), [entries]);
+  const { pick, selectRange, anchor } = useSelectClick({ order, selection, onSelection, onFocus });
 
   const click = useCallback(
     (e: MouseEvent, rel: string) => {
@@ -71,27 +62,9 @@ export function ContentGrid({
         longPressed.current = false;
         return;
       }
-      if (pointer.current === 'touch' && !e.shiftKey) {
-        const next = new Set(selection);
-        if (next.has(rel)) next.delete(rel);
-        else next.add(rel);
-        onSelection(next);
-        anchor.current = rel;
-      } else if (e.shiftKey && anchor.current) {
-        selectRange(rel, e.metaKey || e.ctrlKey ? selection : new Set());
-      } else if (e.metaKey || e.ctrlKey) {
-        const next = new Set(selection);
-        if (next.has(rel)) next.delete(rel);
-        else next.add(rel);
-        onSelection(next);
-        anchor.current = rel;
-      } else {
-        onSelection(new Set([rel]));
-        anchor.current = rel;
-      }
-      onFocus(rel);
+      pick(rel, { shift: e.shiftKey, meta: e.metaKey || e.ctrlKey, touch: pointer.current === 'touch' });
     },
-    [selection, onSelection, onFocus, selectRange],
+    [pick],
   );
 
   // Right-click / long-press: a tile outside the selection becomes the selection (mouse, like Finder)
@@ -171,7 +144,7 @@ export function ContentGrid({
     };
     el.addEventListener('keydown', onKey);
     return () => el.removeEventListener('keydown', onKey);
-  }, [entries, focused, size, onSelection, onFocus]);
+  }, [entries, focused, size, onSelection, onFocus, anchor]);
 
   const drag = (e: DragEvent, on: boolean) => {
     if (!onDropFiles || !e.dataTransfer.types.includes('Files')) return;

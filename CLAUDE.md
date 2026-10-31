@@ -20,7 +20,8 @@ apps/web/          React + Vite. src/
   theme/           tokens.css (design.md, Nomad green) + app.css (all styles)
   api/             fetch client + react-query hooks + SSE job events
   organize/        Workspace (resizable panes) shared by Organize & Import, grid, filters, dialogs
-  pages/           Login, Home, Import, Organize, Automation, Immich (TBA), Settings, Trash
+  pages/           Login, Home, Import, Organize, GPS (map), Automation, Immich (TBA), Settings, Trash
+  gps/             GPS page panes: FileList (side pane) + GpsMap (map, place, circle, tighten)
 apps/app-icon.svg  The logo (single source; Vite emits favicon/PNGs from it)
 fixtures/          Sample media (regenerate: scripts/make-fixtures.sh)
 docker/            entrypoint (PUID/PGID via su-exec), hash-password
@@ -38,7 +39,7 @@ npm run hash-password -- 'pw'    # bcrypt hash for admin.passwordHash
 
 The server dev loop resolves `@io/shared` to TS source via the `development` export condition; the production build uses `packages/shared/dist`.
 
-**Versioning and releases:** the version lives in every `package.json` (currently 0.2.1; keep them in sync). Push an annotated semver tag (`git tag -a 0.2.0 --cleanup=verbatim -F notes.md && git push origin 0.2.0`). `.github/workflows/docker-publish.yml` then builds amd64+arm64 → `ghcr.io/zeroomar/image-organizer:<ver>, :<major.minor>, :latest`, passing the tag as `APP_VERSION`, and `release.yml` publishes a GitHub Release from the tag message (there is no CHANGELOG.md). At runtime the version is `APP_VERSION`, falling back to the root `package.json` (`apps/server/src/version.ts`), and is exposed in `/api/health`, `/api/config`, Home and Settings.
+**Versioning and releases:** the version lives in every `package.json` (currently 0.3.0; keep them in sync). Push an annotated semver tag (`git tag -a 0.2.0 --cleanup=verbatim -F notes.md && git push origin 0.2.0`). `.github/workflows/docker-publish.yml` then builds amd64+arm64 → `ghcr.io/zeroomar/image-organizer:<ver>, :<major.minor>, :latest`, passing the tag as `APP_VERSION`, and `release.yml` publishes a GitHub Release from the tag message (there is no CHANGELOG.md). At runtime the version is `APP_VERSION`, falling back to the root `package.json` (`apps/server/src/version.ts`), and is exposed in `/api/health`, `/api/config`, Home and Settings.
 
 **Committed vs ignored:** `docker-compose.example.yml` is the template; the real `docker-compose.yml` is git-ignored (secrets). `.local-test/`, `dist/`, `node_modules/` and the DB files are ignored. `.dockerignore` keeps the build context to sources only (no tests, fixtures, docs, images, `.claude`).
 

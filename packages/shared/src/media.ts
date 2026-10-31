@@ -58,6 +58,15 @@ export interface GpsPoint {
   alt?: number | null;
 }
 
+/**
+ * Pull a point toward `center`, keeping `scale` of its distance (0 = on the center, 1 = unchanged).
+ * Linear in lat/lon, which is exact enough for the small areas a scattered cluster covers. Altitude is kept.
+ */
+export function gatherPoint(p: GpsPoint, center: { lat: number; lon: number }, scale: number): GpsPoint {
+  const round = (n: number) => Math.round(n * 1e7) / 1e7;
+  return { lat: round(center.lat + (p.lat - center.lat) * scale), lon: round(center.lon + (p.lon - center.lon) * scale), alt: p.alt ?? null };
+}
+
 /** Normalized metadata read from a file by ExifTool. Raw date strings are kept as ExifTool prints them. */
 export interface MediaMeta {
   width?: number;

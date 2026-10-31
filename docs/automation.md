@@ -28,6 +28,7 @@ Steps are shared with the batch bar. `STEP_INFO` marks which ones the rule edito
 | `rename` | `templates?` | uses Settings templates |
 | `syncFileDates` | — | mtime ← capture date |
 | `setGps` / `clearGps` | `lat, lon, alt?` | |
+| `gatherGps` | `lat, lon, scale` | UI only (GPS page): pulls positions toward a center, keeping `scale` of each distance; files without GPS are skipped |
 | `copyMetadata` | `source, groups, tags` | UI only |
 | `editTags` | `tags` | UI only |
 | `move` | `dest` | |

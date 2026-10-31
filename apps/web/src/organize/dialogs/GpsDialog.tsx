@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import { useConfig } from '../../api/hooks';
 import { ActionDialog } from '../../components/ActionDialog';
+import { PlaceSearch } from '../../components/PlaceSearch';
 
 interface Point {
   lat: number;
@@ -45,9 +46,6 @@ export function GpsDialog({
   const [lon, setLon] = useState(start ? String(start.lon) : '');
   const [alt, setAlt] = useState(start?.alt != null ? String(start.alt) : '');
   const [clear, setClear] = useState(false);
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState<{ display_name: string; lat: string; lon: string }[]>([]);
-  const [searchErr, setSearchErr] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [geoMsg, setGeoMsg] = useState<string | null>(null);
 
@@ -87,19 +85,6 @@ export function GpsDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const search = async () => {
-    if (!config || !q.trim()) return;
-    setSearchErr(null);
-    try {
-      const res = await fetch(`${config.nominatimUrl.replace(/\/$/, '')}/search?format=json&limit=8&q=${encodeURIComponent(q)}`, {
-        referrerPolicy: 'strict-origin-when-cross-origin',
-      });
-      setResults(await res.json());
-    } catch {
-      setSearchErr('Search failed (is the browser online?)');
-    }
-  };
-
   const withGps = entries.filter((e) => e.meta.gps);
 
   const { steps, invalid } = useMemo((): { steps: Step[] | null; invalid: string | null } => {
@@ -116,39 +101,16 @@ export function GpsDialog({
   if (!config) return null;
   return (
     <ActionDialog title="GPS position" eyebrow="Batch action" selection={selection} steps={steps} invalid={invalid} onClose={onClose} wide>
-      <div className="row">
-        <input
-          className="input grow"
-          placeholder="Search a place…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && search()}
-          disabled={clear}
-        />
-        <button className="btn" onClick={search} disabled={clear || !q.trim()}>
-          Search
-        </button>
-        <button className="btn" onClick={locate} disabled={clear || locating}>
-          {locating ? 'Locating…' : 'Use my location'}
-        </button>
-      </div>
-      {searchErr && <div className="error-text caption">{searchErr}</div>}
+      <PlaceSearch
+        disabled={clear}
+        onPick={(p) => place(p, true)}
+        extra={
+          <button className="btn" onClick={locate} disabled={clear || locating}>
+            {locating ? 'Locating…' : 'Use my location'}
+          </button>
+        }
+      />
       {(locating || geoMsg) && <div className="caption muted">{locating ? 'Getting your current location…' : geoMsg}</div>}
-      {results.length > 0 && (
-        <div className="search-results">
-          {results.map((r) => (
-            <button
-              key={`${r.lat},${r.lon}`}
-              onClick={() => {
-                place({ lat: Number(r.lat), lon: Number(r.lon) }, true);
-                setResults([]);
-              }}
-            >
-              {r.display_name}
-            </button>
-          ))}
-        </div>
-      )}
       <div className="map" style={{ opacity: clear ? 0.4 : 1, pointerEvents: clear ? 'none' : undefined }}>
         <MapContainer
           center={point ? [point.lat, point.lon] : [fallbackCenter.lat, fallbackCenter.lon]}

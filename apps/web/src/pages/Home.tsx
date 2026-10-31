@@ -39,6 +39,17 @@ export function HomePage() {
             <span aria-hidden>→</span>
           </div>
         </Link>
+        <Link to="/gps" className="home-card">
+          <span className="eyebrow">Map</span>
+          <h2 className="card-title">GPS</h2>
+          <p className="muted body-sm" style={{ margin: 0 }}>
+            See a folder on a map, place files without GPS and tighten scattered clusters.
+          </p>
+          <div className="card-foot">
+            <span />
+            <span aria-hidden>→</span>
+          </div>
+        </Link>
         <Link to="/automation" className="home-card">
           <span className="eyebrow">Rules</span>
           <h2 className="card-title">Automation</h2>

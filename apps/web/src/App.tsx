@@ -8,6 +8,7 @@ import { HomePage } from './pages/Home';
 import { ImmichPage } from './pages/Immich';
 import { ImportPage } from './pages/Import';
 import { LoginPage } from './pages/Login';
+import { GpsPage } from './pages/Gps';
 import { OrganizePage } from './pages/Organize';
 import { SettingsPage } from './pages/Settings';
 import { TrashPage } from './pages/Trash';
@@ -49,6 +50,7 @@ export function App() {
           <Route path="/organize" element={<OrganizePage />} />
           {/* Old British spelling; keeps bookmarks working. */}
           <Route path="/organise" element={<Navigate to={{ pathname: '/organize', search: location.search }} replace />} />
+          <Route path="/gps" element={<GpsPage />} />
           <Route path="/automation" element={<AutomationPage />} />
           <Route path="/immich" element={<ImmichPage />} />
           <Route path="/settings" element={<SettingsPage />} />
