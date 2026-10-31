@@ -912,6 +912,64 @@ table.table {
   color: #ff8a80;
 }
 
+/* Copy metadata comparison */
+.compare-table th,
+.compare-table td {
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compare-table th:first-child {
+  left: 0;
+  z-index: 1;
+}
+.compare-table td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--surface-1);
+}
+.compare-table tbody tr {
+  cursor: pointer;
+}
+.compare-table tbody tr:hover td {
+  background: var(--surface-2);
+}
+.compare-table tr.source td {
+  background: var(--accent-soft);
+}
+.compare-table tr.source td:first-child {
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.compare-table td.changes {
+  color: var(--warning);
+}
+.compare-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.compare-file img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: var(--r-xs);
+  background: #0a0b0d;
+  flex: none;
+}
+.compare-file > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.compare-name {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Map */
 .map {
   height: 340px;

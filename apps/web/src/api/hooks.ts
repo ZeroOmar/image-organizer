@@ -10,7 +10,7 @@ import type {
   TrashItem,
   TreeNode,
 } from '@io/shared';
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api, qs } from './client';
 
@@ -57,11 +57,22 @@ export const useFolder = (root: RootName, rel: string, recursive: boolean) =>
     placeholderData: (prev) => (prev && prev.root === root ? prev : undefined),
   });
 
+export type TagGroups = Record<string, Record<string, unknown>>;
+
 export const useMetadata = (root: RootName, rel: string | null) =>
   useQuery({
     queryKey: keys.metadata(root, rel ?? ''),
-    queryFn: () => api<Record<string, Record<string, unknown>>>(`/api/metadata?${qs({ root, rel: rel! })}`),
+    queryFn: () => api<TagGroups>(`/api/metadata?${qs({ root, rel: rel! })}`),
     enabled: !!rel,
+  });
+
+/** All tags for several files at once (same cache entries as `useMetadata`). */
+export const useMetadataMany = (files: { root: RootName; rel: string }[]) =>
+  useQueries({
+    queries: files.map((f) => ({
+      queryKey: keys.metadata(f.root, f.rel),
+      queryFn: () => api<TagGroups>(`/api/metadata?${qs({ root: f.root, rel: f.rel })}`),
+    })),
   });
 
 export const useJobs = () => useQuery({ queryKey: keys.jobs, queryFn: () => api<JobInfo[]>('/api/jobs') });

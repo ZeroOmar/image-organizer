@@ -50,6 +50,10 @@ Pass `onEditGps` to `Workspace` to enable it (Organize does; Import stays read-o
 - Like Bridge, an edit applies to the whole selection when it includes the shown file, otherwise to that file only. It runs as an `editTags` job via `runJobAndWait()`, so it can be undone from the Jobs menu, and ExifTool errors appear under the field (`Metadata.write` throws when a value couldn't be written).
 - GPS uses the map dialog ("Add location" / "Edit on map").
 
+## Copy metadata dialog
+
+The source is picked from a comparison table: one row per selected file (thumbnail, name, radio), one column per tag that will be copied. Values come from `/api/metadata` (`useMetadataMany`). Click a row to make it the source; target cells that differ from the source are highlighted because the copy will change them. The table shows at most 50 files (one ExifTool read each).
+
 ## GPS dialog
 
 A file with GPS opens on its position. Otherwise the dialog asks for the browser's current location (`navigator.geolocation`) and marks it. That needs a secure context: HTTPS behind the proxy, or `localhost`/`127.0.0.1` locally. If permission is denied, pick on the map, search, type coordinates or copy from a file. "Use my location" re-runs the lookup.
