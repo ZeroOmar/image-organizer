@@ -47,6 +47,11 @@ export function useSelectClick({
         else next.add(rel);
         onSelection(next);
         anchor.current = rel;
+        // Deselecting must not leave the removed file as the previewed one: focus the last remaining file in order.
+        if (!next.has(rel)) {
+          onFocus([...order].reverse().find((r) => next.has(r)) ?? null);
+          return;
+        }
       } else {
         onSelection(new Set([rel]));
         anchor.current = rel;

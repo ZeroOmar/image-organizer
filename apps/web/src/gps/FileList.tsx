@@ -25,18 +25,20 @@ export function FileList({ api }: { api: WorkspaceApi }) {
 
   return (
     <div className="file-list">
-      <div className="seg" role="tablist">
-        {(
-          [
-            ['all', 'All'],
-            ['none', 'No GPS'],
-            ['gps', 'With GPS'],
-          ] as const
-        ).map(([k, label]) => (
-          <button key={k} role="tab" className={show === k ? 'active' : ''} onClick={() => setShow(k)}>
-            {label} <span className="subtle">{counts[k]}</span>
-          </button>
-        ))}
+      <div className="file-list-head">
+        <div className="seg" role="tablist">
+          {(
+            [
+              ['all', 'All'],
+              ['none', 'No GPS'],
+              ['gps', 'With GPS'],
+            ] as const
+          ).map(([k, label]) => (
+            <button key={k} role="tab" className={show === k ? 'active' : ''} onClick={() => setShow(k)}>
+              {label} <span className="subtle">{counts[k]}</span>
+            </button>
+          ))}
+        </div>
       </div>
       <div ref={list} onPointerDown={(e) => (pointer.current = e.pointerType)}>
         {rows.length === 0 && <div className="caption muted" style={{ padding: 12 }}>No files.</div>}
@@ -52,6 +54,10 @@ export function FileList({ api }: { api: WorkspaceApi }) {
               ev.dataTransfer.effectAllowed = 'copy';
             }}
             onClick={(ev) => api.pick(e.rel, { shift: ev.shiftKey, meta: ev.metaKey || ev.ctrlKey, touch: pointer.current === 'touch' })}
+            onContextMenu={(ev) => {
+              ev.preventDefault();
+              api.openMenu(ev.clientX, ev.clientY, e.rel, pointer.current === 'touch');
+            }}
             title={e.meta.gps ? `${e.meta.gps.lat.toFixed(5)}, ${e.meta.gps.lon.toFixed(5)}` : 'No GPS: select it, choose Place and click the map, or drag it onto the map'}
           >
             <img src={thumbUrl(e, 320)} alt="" loading="lazy" draggable={false} />

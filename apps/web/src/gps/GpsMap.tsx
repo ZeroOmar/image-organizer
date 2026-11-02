@@ -1,7 +1,7 @@
 import { gatherPoint, type EnrichedEntry, type FileRef } from '@io/shared';
 import L from 'leaflet';
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { Circle, CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
+import { Circle, CircleMarker, MapContainer, Marker, Pane, Polyline, TileLayer, Tooltip, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
 import { runJobAndWait, useConfig } from '../api/hooks';
 import { PlaceSearch } from '../components/PlaceSearch';
 import type { WorkspaceApi } from '../organize/Workspace';
@@ -26,11 +26,14 @@ function useTokens() {
 const pinIcon = L.divIcon({ className: 'gps-pin', iconSize: [22, 22], iconAnchor: [11, 11] });
 const fmt = (p: LatLon) => `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
 
-function fit(map: L.Map, pts: LatLon[]) {
+// Extra room at the top and bottom: the toolbar and the action bar float over the map there.
+const PAD_TL: L.PointTuple = [48, 150];
+const PAD_BR: L.PointTuple = [64, 110];
+
+function fit(map: L.Map, pts: LatLon[], animate = false) {
   if (!pts.length) return;
-  if (pts.length === 1) map.setView([pts[0].lat, pts[0].lon], 15);
-  // Extra room at the top and bottom: the toolbar and the action bar float over the map there.
-  else map.fitBounds(L.latLngBounds(pts.map((p) => [p.lat, p.lon])), { paddingTopLeft: [48, 150], paddingBottomRight: [64, 110], maxZoom: 17 });
+  if (pts.length === 1) map.setView([pts[0].lat, pts[0].lon], 15, { animate });
+  else map.fitBounds(L.latLngBounds(pts.map((p) => [p.lat, p.lon])), { paddingTopLeft: PAD_TL, paddingBottomRight: PAD_BR, maxZoom: 17, animate });
 }
 
 /** Zoom to the markers once per folder (not after every edit), and again whenever `nonce` changes (Fit button). */
@@ -48,6 +51,47 @@ function FitMarkers({ points, folderKey, nonce }: { points: LatLon[]; folderKey:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nonce]);
   return null;
+}
+
+/** When the highlighted files (selection, or the focused file) change, zoom to the one file or fit them all. */
+function FollowSelection({ points, selKey }: { points: LatLon[]; selKey: string }) {
+  const map = useMap();
+  const pts = useRef(points);
+  pts.current = points;
+  useEffect(() => {
+    const p = pts.current;
+    if (p.length) fit(map, p, true);
+  }, [map, selKey]);
+  return null;
+}
+
+/** The status-bar zoom slider on the GPS page: follows the map's zoom and sets it. */
+export function ZoomSlider({ map }: { map: L.Map | null }) {
+  const [zoom, setZoom] = useState(() => map?.getZoom() ?? 0);
+  useEffect(() => {
+    if (!map) return;
+    const sync = () => setZoom(map.getZoom());
+    sync();
+    map.on('zoomend', sync);
+    return () => void map.off('zoomend', sync);
+  }, [map]);
+  if (!map) return null;
+  return (
+    <>
+      <span className="subtle">Zoom</span>
+      <input
+        type="range"
+        min={map.getMinZoom()}
+        max={Number.isFinite(map.getMaxZoom()) ? map.getMaxZoom() : 19}
+        value={zoom}
+        onChange={(e) => {
+          setZoom(Number(e.target.value));
+          map.setZoom(Number(e.target.value));
+        }}
+        aria-label="Map zoom"
+      />
+    </>
+  );
 }
 
 /** Panes resize without a window resize; Leaflet has to be told. */
@@ -117,10 +161,11 @@ function DrawCircle({ onDraw, onDone }: { onDraw: (c: Drawn) => void; onDone: (c
  * The GPS page's center pane: every geotagged file in the folder as a marker, plus tools to
  * place files without GPS (click, or drag from the list) and to circle-select and tighten a scattered cluster.
  */
-export function GpsMap({ api }: { api: WorkspaceApi }) {
+export function GpsMap({ api, onMap }: { api: WorkspaceApi; onMap?: (map: L.Map | null) => void }) {
   const config = useConfig().data;
   const color = useTokens();
   const [map, setMap] = useState<L.Map | null>(null);
+  useEffect(() => onMap?.(map), [map, onMap]);
   const [mode, setMode] = useState<Mode>('select');
   const [fitNonce, setFitNonce] = useState(0);
   const [pending, setPending] = useState<(LatLon & { rels: string[] }) | null>(null);
@@ -135,6 +180,43 @@ export function GpsMap({ api }: { api: WorkspaceApi }) {
   const located = useMemo(() => api.visible.filter((e): e is EnrichedEntry & { meta: { gps: LatLon } } => !!e.meta.gps), [api.visible]);
   const points = useMemo(() => located.map((e) => e.meta.gps), [located]);
   const nSelected = api.selected.length;
+  const focusedRel = api.focused?.rel ?? null;
+  // Highlighted = selected or focused. Each state gets its own map pane so highlighted markers always draw on top
+  // (SVG keeps creation order, so sorting React children alone doesn't lift them over a stack of plain markers).
+  const tier = (rel: string) => (rel === focusedRel ? 'focused' : api.selectedRels.has(rel) ? 'selected' : 'plain');
+  const highlighted = useMemo(() => located.filter((e) => e.rel === focusedRel || api.selectedRels.has(e.rel)), [located, focusedRel, api.selectedRels]);
+  const highlightKey = useMemo(() => highlighted.map((e) => e.rel).join('\n'), [highlighted]);
+  const highlightPts = useMemo(() => highlighted.map((e) => e.meta.gps), [highlighted]);
+  const marker = (e: (typeof located)[number]) => {
+    const t = tier(e.rel);
+    return (
+      <CircleMarker
+        // `interactive` and the pane can't change after creation: remount when the mode or the tier does.
+        key={`${e.rel}:${mode}:${t}`}
+        center={[e.meta.gps.lat, e.meta.gps.lon]}
+        radius={t === 'focused' ? 11 : t === 'selected' ? 9 : 7}
+        interactive={mode === 'select'}
+        pathOptions={{
+          // Light OSM tiles: a dark dot with a light ring reads best; selection turns it green, focus adds a dark ring.
+          color: t === 'focused' ? color.ink : color.canvas,
+          weight: t === 'plain' ? 2 : 3,
+          fillColor: t === 'plain' ? color.ink : color.accent,
+          fillOpacity: 0.95,
+        }}
+        eventHandlers={{
+          click: (ev) => {
+            L.DomEvent.stopPropagation(ev);
+            const o = ev.originalEvent;
+            api.pick(e.rel, { shift: o.shiftKey, meta: o.metaKey || o.ctrlKey, touch: pointer.current === 'touch' });
+          },
+        }}
+      >
+        <Tooltip direction="top" offset={[0, -6]}>
+          {e.name}
+        </Tooltip>
+      </CircleMarker>
+    );
+  };
   const ref = (rel: string): FileRef => ({ root: api.root, rel });
 
   // Clear tool state when the folder changes.
@@ -254,40 +336,27 @@ export function GpsMap({ api }: { api: WorkspaceApi }) {
           />
         )}
 
-        {/* Unselected first so selected and focused markers draw on top. */}
-        {[...located]
-          .sort((a, b) => Number(api.selectedRels.has(a.rel)) - Number(api.selectedRels.has(b.rel)) || Number(a.rel === api.focused?.rel) - Number(b.rel === api.focused?.rel))
-          .map((e) => {
-            const sel = api.selectedRels.has(e.rel);
-            const foc = e.rel === api.focused?.rel;
-            return (
-              <CircleMarker
-                // `interactive` can't change after creation: remount when the mode does.
-                key={`${e.rel}:${mode}`}
-                center={[e.meta.gps.lat, e.meta.gps.lon]}
-                radius={foc ? 10 : sel ? 8 : 7}
-                interactive={mode === 'select'}
-                pathOptions={{
-                  // Light OSM tiles: a light dot with a dark ring reads best; selection turns it green.
-                  color: foc ? color.ink : color.canvas,
-                  weight: foc ? 3 : 2,
-                  fillColor: sel || foc ? color.accent : color.ink,
-                  fillOpacity: 0.95,
-                }}
-                eventHandlers={{
-                  click: (ev) => {
-                    L.DomEvent.stopPropagation(ev);
-                    const o = ev.originalEvent;
-                    api.pick(e.rel, { shift: o.shiftKey, meta: o.metaKey || o.ctrlKey, touch: pointer.current === 'touch' });
-                  },
-                }}
-              >
-                <Tooltip direction="top" offset={[0, -6]}>
-                  {e.name}
-                </Tooltip>
-              </CircleMarker>
-            );
-          })}
+        <FollowSelection points={highlightPts} selKey={highlightKey} />
+        {/* Plain markers in Leaflet's overlay pane; halos, selected and focused in panes stacked above it. */}
+        {located.filter((e) => tier(e.rel) === 'plain').map(marker)}
+        <Pane name="gps-halo" style={{ zIndex: 405 }}>
+          {highlighted.map((e) => (
+            // A pulsing halo under each highlighted marker, so it stands out even inside a dense cluster.
+            <CircleMarker
+              key={`h:${e.rel}:${e.rel === focusedRel}`}
+              center={[e.meta.gps.lat, e.meta.gps.lon]}
+              radius={e.rel === focusedRel ? 20 : 15}
+              interactive={false}
+              pathOptions={{ className: 'gps-halo', color: color.accent, weight: 2, fillColor: color.accent, fillOpacity: 0.3 }}
+            />
+          ))}
+        </Pane>
+        <Pane name="gps-selected" style={{ zIndex: 410 }}>
+          {located.filter((e) => tier(e.rel) === 'selected').map(marker)}
+        </Pane>
+        <Pane name="gps-focused" style={{ zIndex: 420 }}>
+          {located.filter((e) => tier(e.rel) === 'focused').map(marker)}
+        </Pane>
 
         {(drawing ?? circle) && (
           <Circle

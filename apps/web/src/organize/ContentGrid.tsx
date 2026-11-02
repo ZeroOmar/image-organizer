@@ -1,18 +1,7 @@
 import { formatDisplay, type EnrichedEntry } from '@io/shared';
-import { memo, useCallback, useEffect, useMemo, useRef, type DragEvent, type MouseEvent, type PointerEvent } from 'react';
+import { memo, useCallback, useEffect, useRef, type DragEvent, type MouseEvent, type PointerEvent } from 'react';
 import { thumbUrl } from '../api/client';
-import { useSelectClick, type Selection } from './useSelectClick';
-
-export type { Selection };
-
-/** What the grid reports when a tile (or empty space) is right-clicked or long-pressed. */
-export interface GridMenuRequest {
-  x: number;
-  y: number;
-  rel: string | null;
-  /** Select everything between the last clicked tile and this one; absent when there is no anchor. */
-  selectRange?: () => void;
-}
+import type { PickModifiers, Selection } from './useSelectClick';
 
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_SLOP = 10;
@@ -30,7 +19,7 @@ export function ContentGrid({
   selection,
   onSelection,
   focused,
-  onFocus,
+  pick,
   size,
   highlight,
   onDropFiles,
@@ -41,11 +30,13 @@ export function ContentGrid({
   selection: Selection;
   onSelection: (s: Selection) => void;
   focused: string | null;
-  onFocus: (rel: string | null) => void;
+  /** The workspace's click selection (shared with custom panes so they keep one anchor). */
+  pick: (rel: string, m?: PickModifiers) => void;
   size: number;
   highlight: boolean;
   onDropFiles?: (files: File[]) => void;
-  onMenu?: (req: GridMenuRequest) => void;
+  /** Open the context menu for a tile (or empty space); the workspace applies the selection rules. */
+  onMenu?: (x: number, y: number, rel: string | null, touch: boolean) => void;
   empty: string;
 }) {
   const area = useRef<HTMLDivElement>(null);
@@ -53,8 +44,6 @@ export function ContentGrid({
   const pointer = useRef<string>('mouse');
   const press = useRef<{ timer: number; x: number; y: number } | null>(null);
   const longPressed = useRef(false);
-  const order = useMemo(() => entries.map((x) => x.rel), [entries]);
-  const { pick, selectRange, anchor } = useSelectClick({ order, selection, onSelection, onFocus });
 
   const click = useCallback(
     (e: MouseEvent, rel: string) => {
@@ -67,27 +56,8 @@ export function ContentGrid({
     [pick],
   );
 
-  // Right-click / long-press: a tile outside the selection becomes the selection (mouse, like Finder)
-  // or joins it (touch, so a selection built by tapping survives).
-  const openMenu = (x: number, y: number, rel: string | null, touch: boolean) => {
-    if (!onMenu) return;
-    let base = selection;
-    if (rel && !selection.has(rel)) {
-      base = touch ? new Set([...selection, rel]) : new Set([rel]);
-      onSelection(base);
-    }
-    if (rel) onFocus(rel);
-    const from = anchor.current;
-    onMenu({
-      x,
-      y,
-      rel,
-      selectRange: rel && from && from !== rel && entries.some((e) => e.rel === from) ? () => selectRange(rel, base) : undefined,
-    });
-    if (rel) anchor.current = rel;
-  };
-  const openMenuRef = useRef(openMenu);
-  openMenuRef.current = openMenu;
+  const onMenuRef = useRef(onMenu);
+  onMenuRef.current = onMenu;
 
   const tileAt = (target: EventTarget | null) => (target as HTMLElement | null)?.closest<HTMLElement>('[data-rel]')?.dataset.rel ?? null;
 
@@ -111,7 +81,7 @@ export function ContentGrid({
       timer: window.setTimeout(() => {
         press.current = null;
         longPressed.current = true;
-        openMenuRef.current(x, y, rel, true);
+        onMenuRef.current?.(x, y, rel, true);
       }, LONG_PRESS_MS),
     };
   };
@@ -136,15 +106,13 @@ export function ContentGrid({
         const i = Math.max(0, entries.findIndex((x) => x.rel === focused));
         const delta = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key]!;
         const next = entries[Math.min(entries.length - 1, Math.max(0, i + delta))];
-        onFocus(next.rel);
-        onSelection(new Set([next.rel]));
-        anchor.current = next.rel;
+        pick(next.rel);
         el.querySelector(`[data-rel="${CSS.escape(next.rel)}"]`)?.scrollIntoView({ block: 'nearest' });
       }
     };
     el.addEventListener('keydown', onKey);
     return () => el.removeEventListener('keydown', onKey);
-  }, [entries, focused, size, onSelection, onFocus, anchor]);
+  }, [entries, focused, size, onSelection, pick]);
 
   const drag = (e: DragEvent, on: boolean) => {
     if (!onDropFiles || !e.dataTransfer.types.includes('Files')) return;
@@ -170,7 +138,7 @@ export function ContentGrid({
         e.preventDefault();
         // Touch long-press is handled by our own timer (iOS never fires contextmenu, Android does).
         if (pointer.current === 'touch') return;
-        openMenu(e.clientX, e.clientY, tileAt(e.target), false);
+        onMenu(e.clientX, e.clientY, tileAt(e.target), false);
       }}
       onDragOver={(e) => drag(e, true)}
       onDragLeave={(e) => drag(e, false)}

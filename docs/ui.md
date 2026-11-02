@@ -27,7 +27,8 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 ## Workspace (`src/organize/Workspace.tsx`)
 
 ```
-┌ Folders (tree) ┬ breadcrumb · toolbar · Subfolders · Sort ┬ Preview  ┐
+┌ Folders ☐Subf. ┬ breadcrumb · toolbar · Sort              ┬ Preview  ┐
+│ (tree)         │                                           │          │
 ├────────────────┤ ContentGrid (tiles, issue outlines)       ├──────────┤
 │ Filter facets  │ BatchBar                                  │ Metadata │
 │                │ StatusBar (counts, issues, size slider)   │ All tags │
@@ -38,8 +39,9 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 - The current folder lives in the URL (`?path=`). Selection: click, Cmd/Ctrl-click, Shift-click, Cmd+A, Esc, arrow keys, and "Select all" / "Clear" in the status bar.
 - Touch (tablets): a tap toggles a tile in the selection (like Cmd-click), and a tap on empty space doesn't clear it. A long-press opens the context menu.
 - Context menu (`components/ContextMenu.tsx`): right-click or long-press a tile. It lists the page's batch actions, then Select all, Select range to here and Clear selection. A tile outside the selection replaces it (mouse) or joins it (touch). Pages pass `actions(api)` (a `BatchAction[]`) to `Workspace` and render the BatchBar buttons from the same list with `actionButtons()`, so the bar and the menu stay in sync.
+- Preview (`PreviewPane.tsx`): the focused file, or with several selected a fanned stack of up to 5 thumbnails (focused on top, green border) and the count. Cmd/Ctrl-click (or a tap) that deselects a file moves focus to the last remaining selected file, so Preview and Metadata never show a file that left the selection.
 - Filters (`filters.ts`) are computed client-side from the listing: OR within a facet, AND across facets.
-- The page passes `batchBar(api)` (and optionally `toolbar(api)`) render props; `WorkspaceApi` gives `selected`, `selection` (FileRefs), `focused`, `entries`, `folder`.
+- The page passes `batchBar(api)` (and optionally `toolbar(api)`) render props, an optional `statusTools` node that replaces the thumbnail Size slider, plus an optional `folderTools` node shown in the Folders pane header next to the **Subfolders** checkbox; `WorkspaceApi` gives `selected`, `selection` (FileRefs), `focused`, `entries`, `folder`.
 
 ## Inline metadata editing
 
@@ -53,10 +55,10 @@ Pass `onEditGps` to `Workspace` to enable it (Organize does; Import stays read-o
 
 ## GPS page (`src/pages/Gps.tsx`, `src/gps/`)
 
-Uses the same `Workspace`, with two of its panes swapped out: `sidePane` puts the **Files** list (`FileList.tsx`) where the Filter pane is, and `content` puts the map (`GpsMap.tsx`) where the grid is. The pages share selection through `WorkspaceApi.pick/setSelection/focusRel`, which use `organize/useSelectClick.ts`, the same click rules the grid uses, touch toggling included. A **Media | Import** switch in the toolbar sets `?root=`.
+Uses the same `Workspace`, with two of its panes swapped out: `sidePane` puts the **Files** list (`FileList.tsx`) where the Filter pane is, and `content` puts the map (`GpsMap.tsx`) where the grid is. The pages share selection through `WorkspaceApi.pick/setSelection/focusRel`, which use `organize/useSelectClick.ts`, the same click rules the grid uses, touch toggling included. Right-clicking a row opens the same context menu as a grid tile, through `WorkspaceApi.openMenu`. A **Media | Import** switch in the Folders pane header (`folderTools`) sets `?root=`.
 
 - **Files**: All / No GPS / With GPS. Rows click-select, scroll into view when their marker is picked, and can be dragged onto the map.
-- **Map**: one marker per geotagged file, zoomed to fit once per folder (and on **Fit**). Marker colors come from `tokens.css`. Clicking a marker selects the file, and the list and Preview follow.
+- **Map**: one marker per geotagged file, zoomed to fit once per folder (and on **Fit**). Marker colors come from `tokens.css`. Clicking a marker selects the file, and the list and Preview follow. Selected and focused markers sit in their own Leaflet panes above the rest (with a pulsing halo), so they stay visible inside a dense cluster. Whenever the selection or focus changes, the map zooms to the highlighted file (or fits all highlighted files). The status bar's Zoom slider (in place of the thumbnail Size slider) follows and sets the map zoom.
 - **Select / Place / Circle** modes:
   - **Place**: click the map (or drop a list row on it) to drop a draggable pin for the selected files, then **Apply** runs `setGps`.
   - **Circle**: press-and-drag (mouse or touch) to draw a circle, and the geotagged files inside are selected (Shift adds). **Tighten** previews the new positions (yellow) and **Apply** runs `gatherGps` toward their average or the circle center.

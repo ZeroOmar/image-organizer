@@ -5,12 +5,12 @@ import { useSearchParams } from 'react-router-dom';
 import { runJobAndWait, useFolder, useSettings } from '../api/hooks';
 import { ContextMenu, type MenuItem } from '../components/ContextMenu';
 import { FolderTree } from '../components/FolderTree';
-import { ContentGrid, type GridMenuRequest, type Selection } from './ContentGrid';
+import { ContentGrid } from './ContentGrid';
 import { FilterPanel } from './FilterPanel';
 import { applyFilters, sortEntries, type FilterState, type SortKey } from './filters';
 import { MetadataPanel, type MetadataEditing } from './MetadataPanel';
 import { PreviewPane } from './PreviewPane';
-import { useSelectClick, type PickModifiers } from './useSelectClick';
+import { useSelectClick, type PickModifiers, type Selection } from './useSelectClick';
 
 export interface WorkspaceApi {
   root: RootName;
@@ -26,6 +26,8 @@ export interface WorkspaceApi {
   focusRel: (rel: string | null) => void;
   /** Click-select a file like the grid does (modifiers, touch toggle); for custom panes. */
   pick: (rel: string, m?: PickModifiers) => void;
+  /** Open the right-click / long-press menu for a file (or empty space) at a viewport point; for custom panes. */
+  openMenu: (x: number, y: number, rel: string | null, touch?: boolean) => void;
 }
 
 /** A batch action, rendered both as a BatchBar button (via `actionButtons`) and as a context-menu item. */
@@ -48,6 +50,15 @@ export function actionButtons(actions: BatchAction[], selected: number) {
       {a.label}
     </button>
   ));
+}
+
+/** An open context menu: where, for which file, and the range action when there is an anchor. */
+interface MenuRequest {
+  x: number;
+  y: number;
+  rel: string | null;
+  /** Select everything between the last clicked file and this one. */
+  selectRange?: () => void;
 }
 
 const LS = typeof window !== 'undefined' ? window.localStorage : undefined;
@@ -82,6 +93,7 @@ export function Workspace({
   root,
   rootLabel,
   toolbar,
+  folderTools,
   batchBar,
   actions,
   onDropFiles,
@@ -89,10 +101,13 @@ export function Workspace({
   onEditGps,
   content,
   sidePane,
+  statusTools,
 }: {
   root: RootName;
   rootLabel: string;
   toolbar?: (api: WorkspaceApi) => ReactNode;
+  /** Extra controls in the Folders pane header, before the Subfolders checkbox. */
+  folderTools?: ReactNode;
   batchBar: (api: WorkspaceApi) => ReactNode;
   /** Batch actions for the right-click / long-press menu on tiles (same list the BatchBar shows). */
   actions?: (api: WorkspaceApi) => BatchAction[];
@@ -104,6 +119,8 @@ export function Workspace({
   content?: (api: WorkspaceApi) => ReactNode;
   /** Replaces the Filter pane under the folder tree. */
   sidePane?: { label: string; render: (api: WorkspaceApi) => ReactNode };
+  /** Replaces the thumbnail Size slider at the right of the status bar. */
+  statusTools?: ReactNode;
 }) {
   const [params, setParams] = useSearchParams();
   const folder = params.get('path') ?? '';
@@ -115,7 +132,7 @@ export function Workspace({
   const [focusedRel, setFocusedRel] = useState<string | null>(null);
   const [leftTab] = useState<'folders'>('folders');
   const [metaTab, setMetaTab] = useState<'summary' | 'all'>('summary');
-  const [menu, setMenu] = useState<GridMenuRequest | null>(null);
+  const [menu, setMenu] = useState<MenuRequest | null>(null);
 
   const settings = useSettings().data;
   const listing = useFolder(root, folder, recursive);
@@ -128,7 +145,7 @@ export function Workspace({
   const highlight = settings?.issues.enabled ?? true;
 
   const order = useMemo(() => visible.map((e) => e.rel), [visible]);
-  const { pick } = useSelectClick({ order, selection, onSelection: setSelection, onFocus: setFocusedRel });
+  const { pick, selectRange, anchor } = useSelectClick({ order, selection, onSelection: setSelection, onFocus: setFocusedRel });
 
   const go = (rel: string) => {
     // Keep other params (e.g. the GPS page's ?root=).
@@ -140,6 +157,26 @@ export function Workspace({
     });
     setSelection(new Set());
     setFocusedRel(null);
+  };
+
+  // Right-click / long-press (grid tiles and custom panes): a file outside the selection replaces it (mouse, like Finder)
+  // or joins it (touch, so a selection built by tapping survives).
+  const openMenu = (x: number, y: number, rel: string | null, touch = false) => {
+    if (!actions) return;
+    let base = selection;
+    if (rel && !selection.has(rel)) {
+      base = touch ? new Set([...selection, rel]) : new Set([rel]);
+      setSelection(base);
+    }
+    if (rel) setFocusedRel(rel);
+    const from = anchor.current;
+    setMenu({
+      x,
+      y,
+      rel,
+      selectRange: rel && from && from !== rel && order.includes(from) ? () => selectRange(rel, base) : undefined,
+    });
+    if (rel) anchor.current = rel;
   };
 
   const api: WorkspaceApi = {
@@ -154,6 +191,7 @@ export function Workspace({
     setSelection,
     focusRel: setFocusedRel,
     pick,
+    openMenu,
   };
 
   // Like Bridge: edits in the Metadata panel apply to the whole selection when it includes the shown file.
@@ -177,7 +215,7 @@ export function Workspace({
         }
       : undefined;
 
-  const menuItems = (req: GridMenuRequest): MenuItem[] => [
+  const menuItems = (req: MenuRequest): MenuItem[] => [
     ...(actions?.(api) ?? []).map((a) => ({
       label: a.label,
       onSelect: a.run,
@@ -203,6 +241,13 @@ export function Workspace({
               <div className="pane">
                 <div className="pane-head">
                   <button className={`tab ${leftTab === 'folders' ? 'active' : ''}`}>Folders</button>
+                  <div className="pane-head-tools">
+                    {folderTools}
+                    <label className="check caption" title="Include files in subfolders">
+                      <input type="checkbox" checked={recursive} onChange={(e) => setRecursive(e.target.checked)} />
+                      Subfolders
+                    </label>
+                  </div>
                 </div>
                 <div className="pane-body">
                   <FolderTree root={root} selected={folder} onSelect={go} rootLabel={rootLabel} />
@@ -236,10 +281,6 @@ export function Workspace({
                 ))}
               </div>
               {toolbar?.(api)}
-              <label className="check caption" title="Include files in subfolders">
-                <input type="checkbox" checked={recursive} onChange={(e) => setRecursive(e.target.checked)} />
-                Subfolders
-              </label>
               <select
                 className="input"
                 style={{ width: 'auto', minHeight: 28, padding: '2px 8px', fontSize: 13 }}
@@ -268,11 +309,11 @@ export function Workspace({
                 selection={selection}
                 onSelection={setSelection}
                 focused={focused?.rel ?? null}
-                onFocus={setFocusedRel}
+                pick={pick}
                 size={size}
                 highlight={highlight}
                 onDropFiles={onDropFiles ? (files) => onDropFiles(folder, files) : undefined}
-                onMenu={actions ? setMenu : undefined}
+                onMenu={actions ? openMenu : undefined}
                 empty={listing.isLoading ? 'Reading metadata…' : entries.length ? 'No files match the filters.' : emptyText}
               />
             )}
@@ -305,8 +346,12 @@ export function Workspace({
               {highlight && issueCount > 0 && <span className="warning-text">{issueCount} with issues</span>}
               {listing.isFetching && <span className="subtle">Refreshing…</span>}
               <span className="grow" />
-              <span className="subtle">Size</span>
-              <input type="range" min={110} max={340} value={size} onChange={(e) => setSize(Number(e.target.value))} aria-label="Thumbnail size" />
+              {statusTools ?? (
+                <>
+                  <span className="subtle">Size</span>
+                  <input type="range" min={110} max={340} value={size} onChange={(e) => setSize(Number(e.target.value))} aria-label="Thumbnail size" />
+                </>
+              )}
             </div>
           </div>
         </Panel>
@@ -319,7 +364,7 @@ export function Workspace({
                   <button className="tab active">Preview</button>
                 </div>
                 <div className="pane-body" style={{ overflow: 'hidden' }}>
-                  <PreviewPane entry={focused} />
+                  <PreviewPane entry={focused} selected={selected} />
                 </div>
               </div>
             </Panel>

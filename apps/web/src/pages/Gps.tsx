@@ -1,9 +1,10 @@
 import type { EnrichedEntry, FileRef, RootName } from '@io/shared';
+import type L from 'leaflet';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ActionDialog } from '../components/ActionDialog';
 import { FileList } from '../gps/FileList';
-import { GpsMap } from '../gps/GpsMap';
+import { GpsMap, ZoomSlider } from '../gps/GpsMap';
 import { GpsDialog } from '../organize/dialogs/GpsDialog';
 import { actionButtons, Workspace, type BatchAction, type WorkspaceApi } from '../organize/Workspace';
 
@@ -14,6 +15,7 @@ export function GpsPage() {
   const [params, setParams] = useSearchParams();
   const root: RootName = params.get('root') === 'import' ? 'import' : 'media';
   const [dialog, setDialog] = useState<DialogId | null>(null);
+  const [map, setMap] = useState<L.Map | null>(null);
   const [gpsFor, setGpsFor] = useState<{ files: FileRef[]; focused: EnrichedEntry } | null>(null);
   const close = () => setDialog(null);
 
@@ -23,7 +25,7 @@ export function GpsPage() {
     { label: 'Clear GPS', run: () => setDialog('clear'), variant: 'danger' },
   ];
 
-  const toolbar = () => (
+  const rootSwitch = (
     <div className="seg" aria-label="Library">
       {(['media', 'import'] as const).map((r) => (
         <button key={r} className={root === r ? 'active' : ''} onClick={() => r !== root && setParams(r === 'media' ? {} : { root: r })}>
@@ -60,11 +62,12 @@ export function GpsPage() {
       key={root}
       root={root}
       rootLabel={root}
-      toolbar={toolbar}
+      folderTools={rootSwitch}
       batchBar={bar}
       actions={actions}
       sidePane={{ label: 'Files', render: (w) => <FileList api={w} /> }}
-      content={(w) => <GpsMap api={w} />}
+      content={(w) => <GpsMap api={w} onMap={setMap} />}
+      statusTools={<ZoomSlider map={map} />}
       emptyText="This folder has no photos or videos."
       onEditGps={(files, focused) => setGpsFor({ files, focused })}
     />

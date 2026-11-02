@@ -448,11 +448,20 @@ input[type='range'] {
   flex: none;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--s-xs);
-  height: 36px;
+  min-height: 36px;
   padding: 0 var(--s-sm);
   border-bottom: 1px solid var(--hairline-soft);
   background: var(--surface-1);
+}
+.pane-head-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-xs) var(--s-sm);
+  margin-left: auto;
+  padding: 4px 0;
 }
 .pane-head .tab {
   font-size: 12px;
@@ -463,7 +472,8 @@ input[type='range'] {
   background: none;
   border: none;
   padding: 0 6px;
-  height: 100%;
+  align-self: stretch;
+  min-height: 36px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
 }
@@ -771,6 +781,29 @@ input[type='range'] {
   border-radius: var(--r-xs);
 }
 
+/* Several selected: fanned thumbnails, focused on top. */
+.preview-stack {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  max-height: calc(100% - 44px);
+}
+.preview-stack img {
+  position: absolute;
+  inset: 12%;
+  width: 76%;
+  height: 76%;
+  max-height: none;
+  object-fit: cover;
+  border: 3px solid var(--surface-2);
+  border-radius: var(--r-sm);
+  background: #0a0b0d;
+}
+.preview-stack img.top {
+  border-color: var(--accent);
+}
+
 /* Metadata */
 .meta-section {
   border-bottom: 1px solid var(--hairline-soft);
@@ -946,9 +979,15 @@ table.table {
 }
 
 /* GPS page: file list */
+.file-list-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--s-xs);
+  background: var(--canvas);
+}
 .file-list .seg {
   display: flex;
-  margin: var(--s-xs);
 }
 .file-list .seg button {
   flex: 1;
@@ -1009,6 +1048,8 @@ table.table {
 /* GPS page: map */
 .gps-map-area {
   position: relative;
+  /* Keep Leaflet's z-indexes (400–1000) below dialogs, menus and the jobs panel. */
+  isolation: isolate;
   flex: 1;
   min-height: 0;
 }
@@ -1076,6 +1117,26 @@ table.table {
   background: var(--surface-1);
   border: 1px solid var(--hairline);
   font-size: 13px;
+}
+.gps-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: gps-halo 0.9s ease-in-out infinite alternate;
+}
+@keyframes gps-halo {
+  from {
+    transform: scale(0.75);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.15);
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gps-halo {
+    animation: none;
+  }
 }
 .gps-pin {
   border-radius: 50%;
