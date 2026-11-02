@@ -9,7 +9,7 @@ This machine has no Docker. Everything runs natively in the git- and docker-igno
 
 ## Prerequisites
 
-`brew install node@22 exiftool ffmpeg`. The script checks for them and prints hints.
+`brew install node exiftool ffmpeg`. The script checks for them and prints hints.
 
 ## Start
 

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- build: install, compile shared + server, bundle web ----
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /opt/app
 # Toolchain only for native modules that have no prebuilt binary for this platform.
 RUN apk add --no-cache python3 make g++
@@ -16,7 +16,7 @@ COPY apps apps
 RUN npm run build && npm prune --omit=dev
 
 # ---- runtime ----
-FROM node:22-alpine
+FROM node:26-alpine
 # Set by CI from the git tag (docker/metadata-action); falls back to package.json at runtime.
 ARG APP_VERSION=""
 LABEL org.opencontainers.image.title="image-organizer" \

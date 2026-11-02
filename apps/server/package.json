@@ -1,7 +1,7 @@
 {
   "name": "@io/server",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "scripts": {
     "dev": "tsx watch --conditions=development --clear-screen=false src/main.ts",
@@ -29,7 +29,7 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.12",
-    "@types/node": "^22.10.1",
+    "@types/node": "^26.6.6",
     "tsx": "^4.23.15"
   }
 }

@@ -35,13 +35,13 @@ need() { # need <cmd> <brew formula>
     missing=1
   fi
 }
-need node node@22
+need node node
 need exiftool exiftool
 need ffmpeg ffmpeg
 [ "$missing" = 0 ] || exit 1
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-if [ "$NODE_MAJOR" -lt 22 ]; then
-  echo "✗ Node $NODE_MAJOR found; Node 22+ is required (brew install node@22)" >&2
+if [ "$NODE_MAJOR" -lt 26 ]; then
+  echo "✗ Node $NODE_MAJOR found; Node 26+ is required (brew install node)" >&2
   exit 1
 fi
 

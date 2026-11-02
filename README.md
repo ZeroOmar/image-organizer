@@ -278,7 +278,7 @@ Available steps: `applyDates`, `shiftDates`, `setDate`, `setTimezone`, `rename`,
 
 ## Development
 
-Requirements: Node 22+, ExifTool and ffmpeg (`brew install node@22 exiftool ffmpeg`).
+Requirements: Node 26+, ExifTool and ffmpeg (`brew install node exiftool ffmpeg`).
 
 ```bash
 npm install

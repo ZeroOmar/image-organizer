@@ -53,14 +53,18 @@ function FitMarkers({ points, folderKey, nonce }: { points: LatLon[]; folderKey:
   return null;
 }
 
-/** When the highlighted files (selection, or the focused file) change, zoom to the one file or fit them all. */
+/**
+ * When the highlighted files (selection, or the focused file) change, go to the one file (zooming in to 15
+ * when further out, keeping a closer zoom) or fit them all.
+ */
 function FollowSelection({ points, selKey }: { points: LatLon[]; selKey: string }) {
   const map = useMap();
   const pts = useRef(points);
   pts.current = points;
   useEffect(() => {
     const p = pts.current;
-    if (p.length) fit(map, p, true);
+    if (p.length === 1) map.setView([p[0].lat, p[0].lon], Math.max(map.getZoom(), 15));
+    else if (p.length) fit(map, p, true);
   }, [map, selKey]);
   return null;
 }

@@ -1,7 +1,7 @@
 {
   "name": "image-organizer",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "workspaces": [
     "packages/shared",
@@ -9,7 +9,7 @@
     "apps/web"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=26"
   },
   "scripts": {
     "dev": "concurrently -k -n server,web -c green,cyan \"npm:dev -w apps/server\" \"npm:dev -w apps/web\"",
