@@ -48,6 +48,38 @@ export async function moveFile(src: string, dst: string): Promise<void> {
   await fs.unlink(src);
 }
 
+/**
+ * Set a file's access and modified times. Explicit times require owning the file: write access
+ * isn't enough (EPERM), e.g. for files put on the share by another user than PUID. Then, as
+ * ExifTool does on every metadata write, replace the file with an identical copy the app owns
+ * (same folder, same mode) and set the times on that. Returns true when the file was replaced.
+ */
+export async function setFileTimes(abs: string, atime: Date, mtime: Date): Promise<boolean> {
+  try {
+    await fs.utimes(abs, atime, mtime);
+    return false;
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code !== 'EPERM' && code !== 'EACCES') throw e;
+  }
+  const st = await fs.stat(abs);
+  const tmp = path.join(path.dirname(abs), `.io-tmp-${randomUUID()}`);
+  try {
+    await fs.copyFile(abs, tmp, fs.constants.COPYFILE_EXCL);
+    await fs.chmod(tmp, st.mode & 0o7777);
+    await fs.utimes(tmp, atime, mtime);
+    await fs.rename(tmp, abs);
+  } catch (e) {
+    await fs.rm(tmp, { force: true });
+    const uid = process.getuid?.();
+    throw new Error(
+      `Can't set the date of ${path.basename(abs)}: it belongs to user ${st.uid}${uid !== undefined ? `, not the app's user ${uid} (PUID)` : ''}, ` +
+        `and its folder isn't writable to replace it (${(e as Error).message}). Set PUID/PGID to the owner of the share.`,
+    );
+  }
+  return true;
+}
+
 /** "name.ext" → first free of name.ext, name_1.ext, name_2.ext … in `dir` (case-insensitive). */
 export async function uniqueName(dir: string, name: string, sep = '_'): Promise<string> {
   const taken = new Set((await fs.readdir(dir).catch(() => [] as string[])).map((n) => n.toLowerCase()));

@@ -353,6 +353,8 @@ docker run --rm ghcr.io/zeroomar/image-organizer:latest node -e \
 
 **Files end up owned by the wrong user / permission denied**: set `PUID`/`PGID` to the owner of the media share (`ls -ln /mnt/photos`). The container checks at startup that every root is readable and writable.
 
+**"EPERM: operation not permitted, utime" when syncing file dates**: the file belongs to a different user than `PUID` (e.g. copied in over SMB or by another container). Only a file's owner may set its dates. Since 0.5.1 the app replaces such a file with an identical copy it owns, the same way ExifTool does for metadata writes, and notes this on the job. If the folder isn't writable either, the job says so; set `PUID`/`PGID` to the share's owner (`ls -ln`).
+
 **"Current location" doesn't work in the GPS dialog**: the browser only allows geolocation over HTTPS (or `localhost`). Use the reverse proxy URL.
 
 **HEIC thumbnails are missing**: the server tries sharp, then ffmpeg, then the JPEG preview embedded in the file. A HEIC without an embedded preview that ffmpeg can't decode shows no thumbnail; its metadata can still be edited.

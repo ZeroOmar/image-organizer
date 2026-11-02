@@ -6,7 +6,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { DB } from '../db/db.js';
 import { encodeHevc, hasX265 } from '../convert/ffmpeg.js';
-import { moveFile } from '../fs/ops.js';
+import { moveFile, setFileTimes } from '../fs/ops.js';
 import type { Roots } from '../fs/roots.js';
 import { HttpError } from '../http/errors.js';
 import type { Indexer } from '../index/indexer.js';
@@ -318,7 +318,9 @@ export class JobEngine extends EventEmitter {
       }
       case 'utimes': {
         const st = await fs.stat(file.abs);
-        await fs.utimes(file.abs, new Date(op.mtimeMs), new Date(op.mtimeMs));
+        if (await setFileTimes(file.abs, new Date(op.mtimeMs), new Date(op.mtimeMs))) {
+          notes.push({ file: refText(op.file), message: `Owned by another user (uid ${st.uid}); replaced with an identical copy owned by the app to set its date` });
+        }
         undo.push({ t: 'utimes', file: op.file, atimeMs: st.atimeMs, mtimeMs: st.mtimeMs });
         return;
       }
@@ -371,7 +373,7 @@ export class JobEngine extends EventEmitter {
             this.indexer.invalidate(u.from);
             break;
           case 'utimes':
-            await fs.utimes(this.roots.resolve(u.file).abs, new Date(u.atimeMs), new Date(u.mtimeMs));
+            await setFileTimes(this.roots.resolve(u.file).abs, new Date(u.atimeMs), new Date(u.mtimeMs));
             break;
           case 'trash':
             await this.trash.restore(u.id);
