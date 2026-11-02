@@ -34,6 +34,7 @@ Steps are shared with the batch bar. `STEP_INFO` marks which ones the rule edito
 | `move` | `dest` | |
 | `moveByDate` | `pattern` e.g. `{YYYY}/{YYYY}-{MM}` | into `/media` |
 | `trash` | — | UI only |
+| `convert` | `crf?`, `preset?` | re-encode videos to HEVC; unset params use Settings → Video conversion; runs on the convert lane; originals go to the trash ([convert.md](convert.md)) |
 
 Steps run in order on a simulated file state, so later steps see earlier renames, moves and date writes in the dry run too.
 

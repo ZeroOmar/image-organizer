@@ -1,4 +1,4 @@
-import { parseExifDate, type MediaKind, type MediaMeta } from '@io/shared';
+import { parseExifDate, videoCodecOf, type MediaKind, type MediaMeta } from '@io/shared';
 import { ExifTool, type WriteTags } from 'exiftool-vendored';
 
 export type TagValue = string | number | string[] | null;
@@ -50,6 +50,8 @@ export class Metadata {
     } else {
       meta.qtCreateDate = date('CreateDate');
       meta.qtCreationDate = date('CreationDate');
+      meta.videoCodec = videoCodecOf(str('CompressorID'));
+      meta.bitrate = num('AvgBitrate');
     }
     const lat = num('GPSLatitude');
     const lon = num('GPSLongitude');
@@ -109,6 +111,15 @@ export class Metadata {
   async copyFrom(source: string, target: string, tags: string[]): Promise<void> {
     for (const k of tags) if (!TAG_NAME.test(k)) throw new Error(`Invalid tag name: ${k}`);
     await this.et.write(target, {}, { writeArgs: ['-overwrite_original', '-P', '-tagsFromFile', source, ...tags.map((t) => `-${t}`)] });
+  }
+
+  /**
+   * Copy every writable tag from `source` (the original of a re-encoded video): QuickTime dates,
+   * Keys (Apple GPS/make/model/creationdate), UserData (Android ©xyz GPS), ItemList, XMP.
+   * ExifTool doesn't copy stream-describing tags (codec, dimensions, handlers), so the new encode stays intact.
+   */
+  async copyAllFrom(source: string, target: string): Promise<void> {
+    await this.et.write(target, {}, { writeArgs: ['-overwrite_original', '-P', '-tagsFromFile', source, '-all:all', '-unsafe'] });
   }
 
   /** Largest embedded JPEG (PreviewImage, then ThumbnailImage). Throws when there is none. */

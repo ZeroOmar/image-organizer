@@ -1,5 +1,7 @@
 import type { EnrichedEntry, FileRef } from '@io/shared';
 import { useState } from 'react';
+import { useConfig } from '../api/hooks';
+import { ConvertDialog } from '../organize/dialogs/ConvertDialog';
 import { CopyMetadataDialog } from '../organize/dialogs/CopyMetadataDialog';
 import { DatesDialog } from '../organize/dialogs/DatesDialog';
 import { GpsDialog } from '../organize/dialogs/GpsDialog';
@@ -7,15 +9,16 @@ import { RenameDialog } from '../organize/dialogs/RenameDialog';
 import { EditTagsDialog, MoveDialog, SyncDatesDialog, TrashDialog } from '../organize/dialogs/SimpleDialogs';
 import { actionButtons, Workspace, type BatchAction, type WorkspaceApi } from '../organize/Workspace';
 
-type DialogId = 'rename' | 'dates' | 'gps' | 'copy' | 'tags' | 'sync' | 'move' | 'trash';
+type DialogId = 'rename' | 'dates' | 'gps' | 'copy' | 'tags' | 'sync' | 'convert' | 'move' | 'trash';
 
 export function OrganizePage() {
   const [dialog, setDialog] = useState<DialogId | null>(null);
   // GPS opened from the Metadata panel: targets the shown file (or the selection that includes it).
   const [gpsFor, setGpsFor] = useState<{ files: FileRef[]; focused: EnrichedEntry } | null>(null);
   const close = () => setDialog(null);
+  const convertAvailable = useConfig().data?.convertAvailable;
 
-  const actions = (): BatchAction[] => {
+  const actions = (w: WorkspaceApi): BatchAction[] => {
     const a = (id: DialogId, label: string, extra?: Partial<BatchAction>): BatchAction => ({ label, run: () => setDialog(id), ...extra });
     return [
       a('rename', 'Rename', { variant: 'primary' }),
@@ -24,6 +27,7 @@ export function OrganizePage() {
       a('copy', 'Copy metadata', { min: 2 }),
       a('tags', 'Edit tags'),
       a('sync', 'Sync file dates'),
+      ...(convertAvailable ? [a('convert', 'Convert to HEVC', { disabled: !w.selected.some((e) => e.kind === 'video') })] : []),
       a('move', 'Move'),
       a('trash', 'Trash', { variant: 'danger' }),
     ];
@@ -36,7 +40,7 @@ export function OrganizePage() {
         <span className="eyebrow" style={{ marginRight: 6 }}>
           {n ? `${n} selected` : 'Select files'}
         </span>
-        {actionButtons(actions(), n)}
+        {actionButtons(actions(w), n)}
         {dialog && <Dialogs id={dialog} w={w} onClose={close} />}
         {gpsFor && (
           <GpsDialog selection={{ files: gpsFor.files }} focused={gpsFor.focused} entries={w.entries} onClose={() => setGpsFor(null)} />
@@ -71,6 +75,8 @@ function Dialogs({ id, w, onClose }: { id: DialogId; w: WorkspaceApi; onClose: (
       return <EditTagsDialog selection={w.selection} focused={w.focused} onClose={onClose} />;
     case 'sync':
       return <SyncDatesDialog selection={w.selection} onClose={onClose} />;
+    case 'convert':
+      return <ConvertDialog selection={w.selection} count={w.selected.filter((e) => e.kind === 'video').length} onClose={onClose} />;
     case 'move':
       return <MoveDialog selection={w.selection} root="media" current={w.folder} onClose={onClose} />;
     case 'trash':

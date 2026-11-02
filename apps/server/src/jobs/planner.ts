@@ -1,5 +1,7 @@
 import {
   COPY_GROUPS,
+  convertSkipReason,
+  describeVideo,
   STEP_INFO,
   gatherPoint,
   baseOf,
@@ -15,6 +17,7 @@ import {
   utcToWallInZone,
   wallInZoneToUtc,
   zoneOffsetMinutes,
+  type ConvertPreset,
   type CopyGroup,
   type FileRef,
   type MediaEntry,
@@ -40,7 +43,8 @@ export type Op =
   | { op: 'rename'; step: number; file: FileRef; to: FileRef }
   | { op: 'move'; step: number; file: FileRef; to: FileRef }
   | { op: 'utimes'; step: number; file: FileRef; mtimeMs: number }
-  | { op: 'trash'; step: number; file: FileRef };
+  | { op: 'trash'; step: number; file: FileRef }
+  | { op: 'convert'; step: number; file: FileRef; crf: number; preset: ConvertPreset; minSavingPct: number; duration?: number };
 
 export interface Plan {
   ops: Op[];
@@ -62,6 +66,8 @@ export interface PlannerDeps {
   indexer: Indexer;
   settings: Settings;
   defaultTz: string;
+  /** ffmpeg has libx265 (only checked when a job converts). */
+  convertAvailable?: boolean;
 }
 
 export async function expandSelection(sel: Selection, roots: Roots): Promise<FileRef[]> {
@@ -310,6 +316,26 @@ async function planStep(step: number, s: Step, files: VFile[], plan: Plan, d: Pl
         d,
         item,
       );
+      return;
+    }
+
+    case 'convert': {
+      if (!d.convertAvailable) throw new HttpError(400, 'Video conversion is unavailable: this ffmpeg build has no libx265 encoder');
+      const c = d.settings.convert;
+      const crf = s.crf ?? c.crf;
+      const preset = s.preset ?? c.preset;
+      const skipped = { codec: 0, bitrate: 0 };
+      for (const v of files) {
+        const m = v.entry.meta;
+        const skip = convertSkipReason(v.entry, c);
+        if (skip === 'codec' || skip === 'bitrate') skipped[skip]++;
+        if (skip) continue;
+        plan.ops.push({ op: 'convert', step, file: { ...v.cur }, crf, preset, minSavingPct: c.minSavingPct, duration: m.duration });
+        item(v, { before: describeVideo(m, v.entry.size), after: `HEVC, CRF ${crf} (${preset})` });
+        v.entry = { ...v.entry, meta: { ...m, videoCodec: 'hevc' } };
+      }
+      if (skipped.codec) plan.warnings.push(`${skipped.codec} video(s) skipped: already ${c.skipCodecs.map((x) => x.toUpperCase()).join('/')}`);
+      if (skipped.bitrate) plan.warnings.push(`${skipped.bitrate} video(s) skipped: below ${c.minBitrateMbps} Mbps`);
       return;
     }
 

@@ -55,6 +55,15 @@ const MIGRATIONS: string[] = [
     last_job_id TEXT
   );
   `,
+  // Video conversion: MediaMeta gained videoCodec/bitrate (re-read cached files), job lanes and notes,
+  // and temp encode files to clean up after a restart.
+  `
+  DELETE FROM media_cache;
+  ALTER TABLE jobs ADD COLUMN lane TEXT NOT NULL DEFAULT 'main';
+  ALTER TABLE jobs ADD COLUMN notes TEXT NOT NULL DEFAULT '[]';
+  ALTER TABLE jobs ADD COLUMN saved_bytes INTEGER NOT NULL DEFAULT 0;
+  CREATE TABLE convert_tmp (path TEXT PRIMARY KEY);
+  `,
 ];
 
 export function openDb(appDir: string): DB {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CONVERT_PRESETS } from './api.js';
 
 export const ISSUE_CHECK_IDS = [
   'missingOriginalDate',
@@ -46,6 +47,18 @@ export const SettingsSchema = z.object({
     })
     .prefault({}),
   trash: z.object({ retentionDays: z.number().int().min(0).nullable().default(null) }).prefault({}),
+  convert: z
+    .object({
+      crf: z.number().int().min(0).max(51).default(24),
+      preset: z.enum(CONVERT_PRESETS).default('medium'),
+      /** Videos already in these codecs are skipped (re-encoding only loses quality). */
+      skipCodecs: z.array(z.enum(['h264', 'hevc', 'av1', 'other'])).default(['hevc', 'av1']),
+      /** Videos below this average bitrate are skipped; savings would be small. 0 = convert all. */
+      minBitrateMbps: z.number().min(0).default(10),
+      /** Keep the original when the result isn't at least this much smaller. */
+      minSavingPct: z.number().int().min(0).max(95).default(20),
+    })
+    .prefault({}),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;

@@ -84,6 +84,7 @@ export const useImportCount = () =>
 export const planJob = (req: JobRequest) => api<PlanResult>('/api/jobs/plan', { method: 'POST', body: req });
 export const submitJob = (req: JobRequest) => api<JobInfo>('/api/jobs', { method: 'POST', body: req });
 export const undoJob = (id: string) => api<JobInfo>(`/api/jobs/${id}/undo`, { method: 'POST' });
+export const cancelJob = (id: string) => api<JobInfo>(`/api/jobs/${id}/cancel`, { method: 'POST' });
 
 /** Submit a job and wait until it finishes; throws the first per-file error (for inline edits). */
 export async function runJobAndWait(req: JobRequest): Promise<JobInfo> {
@@ -113,7 +114,7 @@ export function useJobEvents(enabled: boolean) {
         const rest = list.filter((j) => j.id !== job.id);
         return [job, ...rest].sort((a, b) => b.createdAt - a.createdAt);
       });
-      if (job.status === 'done' || job.status === 'failed') invalidateFiles(qc);
+      if (job.status === 'done' || job.status === 'failed' || job.status === 'cancelled') invalidateFiles(qc);
     });
     return () => es.close();
   }, [enabled, qc]);

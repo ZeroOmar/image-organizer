@@ -1,4 +1,4 @@
-import { STEP_INFO, isValidZone, type PlanResult, type Rule, type Step, type StepType } from '@io/shared';
+import { CONVERT_PRESETS, STEP_INFO, isValidZone, type ConvertPreset, type PlanResult, type Rule, type Step, type StepType } from '@io/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../api/client';
@@ -329,6 +329,33 @@ function StepParams({ step: s, onChange }: { step: Step; onChange: (s: Step) => 
       );
     case 'rename':
       return <span className="caption muted">Uses the templates from Settings.</span>;
+    case 'convert':
+      return (
+        <div className="row">
+          <label className="row" style={{ gap: 6 }}>
+            <span className="caption muted">CRF</span>
+            <input
+              className="input"
+              type="number"
+              min={0}
+              max={51}
+              style={{ width: 90 }}
+              placeholder="Settings"
+              value={s.crf ?? ''}
+              onChange={(e) => onChange({ ...s, crf: e.target.value === '' ? undefined : Math.min(51, Math.max(0, Math.trunc(Number(e.target.value) || 0))) })}
+            />
+          </label>
+          <select className="input" style={{ width: 200 }} value={s.preset ?? ''} onChange={(e) => onChange({ ...s, preset: (e.target.value || undefined) as ConvertPreset | undefined })}>
+            <option value="">Preset from Settings</option>
+            {CONVERT_PRESETS.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <span className="caption muted">Runs on its own queue; originals go to the trash.</span>
+        </div>
+      );
     default:
       return null;
   }

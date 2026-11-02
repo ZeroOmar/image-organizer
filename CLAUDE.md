@@ -14,13 +14,14 @@ apps/server/       Fastify API. src/
   metadata/        ExifTool wrapper (the ONLY ExifTool user) + tag builders for dates/GPS
   index/           Metadata cache (SQLite, size+mtime) + enrich() = resolved date + issues
   jobs/            planner.ts (steps → dry-run items + ops), engine.ts (serial executor, undo)
+  convert/         ffmpeg HEVC encoder (libx265) used by the `convert` step
   trash/ thumbs/ automation/ auth/ settings/
   http/routes/     browse, jobs, import, admin
 apps/web/          React + Vite. src/
   theme/           tokens.css (design.md, Nomad green) + app.css (all styles)
   api/             fetch client + react-query hooks + SSE job events
   organize/        Workspace (resizable panes) shared by Organize & Import, grid, filters, dialogs
-  pages/           Login, Home, Import, Organize, GPS (map), Automation, Immich (TBA), Settings, Trash
+  pages/           Login, Home, Import, Organize, GPS (map), Convert (videos → HEVC), Automation, Immich (TBA), Settings, Trash
   gps/             GPS page panes: FileList (side pane) + GpsMap (map, place, circle, tighten)
 apps/app-icon.svg  The logo (single source; Vite emits favicon/PNGs from it)
 fixtures/          Sample media (regenerate: scripts/make-fixtures.sh)
@@ -46,7 +47,7 @@ The server dev loop resolves `@io/shared` to TS source via the `development` exp
 ## Hard rules
 
 1. **Paths**: always `roots.resolve({root, rel})`. Never join user paths yourself. Moves between roots happen only through import → media (the `move` step) and trash/restore.
-2. **Mutations**: everything that changes files is a **step** run by the **job engine**: plan (dry run) → submit → serial execution → undo entries. Don't write files from route handlers. Trash restore/purge use `jobs.exclusive()`.
+2. **Mutations**: everything that changes files is a **step** run by the **job engine**: plan (dry run) → submit → serial execution → undo entries. Don't write files from route handlers. Trash restore/purge use `jobs.exclusive()`. Jobs with a `convert` step run on a second lane (long encodes only read the original); every file change they make still runs on the main lane through `exclusive()`.
 3. **Undo**: every op records an inverse (tag snapshot, reverse move, previous mtime, trash id). New ops must too.
 4. **ExifTool**: only through `metadata/exiftool.ts`. Writes use `-overwrite_original -P` (keep mtime) and call `indexer.invalidate()` afterwards; the job engine already does this.
 5. **GPS writes**: photos use signed decimals **without** `-n` (exiftool-vendored adds a GPSPosition that `-n` breaks). Videos (`Keys:GPSCoordinates`) need `-n`. See `metadata/tags.ts`.
@@ -61,6 +62,7 @@ The server dev loop resolves `@io/shared` to TS source via the `development` exp
 - [docs/metadata-and-dates.md](docs/metadata-and-dates.md): tags, date sources, TZ resolution, issues
 - [docs/renaming.md](docs/renaming.md): template tokens, conflict numbering, extensions
 - [docs/import.md](docs/import.md): /import root, uploads, move to album
+- [docs/convert.md](docs/convert.md): HEVC video conversion, metadata kept, convert lane, cancel/undo
 - [docs/automation.md](docs/automation.md): rules, steps, watcher, cron
 - [docs/api.md](docs/api.md): every endpoint
 - [docs/ui.md](docs/ui.md): pages, workspace layout, components, design tokens

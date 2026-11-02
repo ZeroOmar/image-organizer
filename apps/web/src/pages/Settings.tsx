@@ -1,9 +1,12 @@
 import {
+  CODEC_LABEL,
+  CONVERT_PRESETS,
   DATE_SOURCES,
   ISSUE_CHECKS,
   defaultSettings,
   parseTemplate,
   previewTemplate,
+  type ConvertPreset,
   type DateSourceId,
   type Settings,
 } from '@io/shared';
@@ -279,6 +282,85 @@ function SettingsForm({ initial }: { initial: Settings }) {
               onChange={(e) => set('trash', { retentionDays: e.target.value === '' ? null : Math.max(0, Number(e.target.value) || 0) })}
             />
             <span className="hint">Empty uses the value from the config. 0 keeps files until you empty the trash.</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <span className="eyebrow">Video conversion</span>
+        <div className="card stack">
+          <p className="muted" style={{ margin: 0 }}>
+            Defaults for Convert to HEVC (Convert page, batch bar and automation). Lower CRF = better quality and bigger files; slower presets give
+            smaller files at the same quality.
+          </p>
+          <div className="grid-2">
+            <div className="field">
+              <label>Quality (CRF, 0–51)</label>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={51}
+                value={s.convert.crf}
+                onChange={(e) => set('convert', { ...s.convert, crf: Math.min(51, Math.max(0, Math.trunc(Number(e.target.value) || 0))) })}
+              />
+              <span className="hint">Default {defaults.convert.crf}. 20 = high quality, 28 = small.</span>
+            </div>
+            <div className="field">
+              <label>Encoder preset</label>
+              <select className="input" value={s.convert.preset} onChange={(e) => set('convert', { ...s.convert, preset: e.target.value as ConvertPreset })}>
+                {CONVERT_PRESETS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              <span className="hint">Default {defaults.convert.preset}.</span>
+            </div>
+            <div className="field">
+              <label>Skip videos under (Mbps)</label>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                step={0.5}
+                value={s.convert.minBitrateMbps}
+                onChange={(e) => set('convert', { ...s.convert, minBitrateMbps: Math.max(0, Number(e.target.value) || 0) })}
+              />
+              <span className="hint">Already-small videos save little. 0 converts all.</span>
+            </div>
+            <div className="field">
+              <label>Keep the original unless the result is at least (% smaller)</label>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={95}
+                value={s.convert.minSavingPct}
+                onChange={(e) => set('convert', { ...s.convert, minSavingPct: Math.min(95, Math.max(0, Math.trunc(Number(e.target.value) || 0))) })}
+              />
+            </div>
+          </div>
+          <div className="field">
+            <label>Skip videos already in</label>
+            <div className="row">
+              {(['hevc', 'av1', 'h264', 'other'] as const).map((k) => (
+                <label className="check" key={k}>
+                  <input
+                    type="checkbox"
+                    checked={s.convert.skipCodecs.includes(k)}
+                    onChange={(e) =>
+                      set('convert', {
+                        ...s.convert,
+                        skipCodecs: e.target.checked ? [...s.convert.skipCodecs, k] : s.convert.skipCodecs.filter((x) => x !== k),
+                      })
+                    }
+                  />
+                  {CODEC_LABEL[k]}
+                </label>
+              ))}
+            </div>
+            <span className="hint">Re-encoding an already efficient video only loses quality.</span>
           </div>
         </div>
       </section>

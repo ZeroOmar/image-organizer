@@ -1045,6 +1045,76 @@ table.table {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+/* Convert page */
+.convert-table {
+  height: 100%;
+  overflow: auto;
+}
+.convert-table .table th {
+  top: 0;
+  white-space: nowrap;
+}
+.convert-table .table td {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.convert-table .num {
+  text-align: right;
+}
+.convert-table tbody tr {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+@media (hover: hover) {
+  .convert-table tbody tr:hover td {
+    background: var(--surface-1);
+  }
+}
+.convert-table tr.focused td {
+  background: var(--surface-2);
+}
+.convert-table tr.selected td {
+  background: var(--accent-soft);
+}
+.convert-table tr.selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.convert-name {
+  display: flex;
+  align-items: center;
+  gap: var(--s-xs);
+  min-width: 0;
+  max-width: 340px;
+}
+.convert-name img {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  object-fit: cover;
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
+}
+.convert-summary {
+  padding: var(--s-sm);
+}
+.convert-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-xs);
+}
+.convert-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s-sm);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+}
+.convert-stats strong {
+  font-size: 20px;
+}
+
 /* GPS page: map */
 .gps-map-area {
   position: relative;

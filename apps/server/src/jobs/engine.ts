@@ -1,9 +1,11 @@
-import { STEP_INFO, type FileRef, type JobInfo, type JobRequest, type JobStatus, type PlanResult } from '@io/shared';
+import { STEP_INFO, isConvertJob, type FileRef, type JobInfo, type JobRequest, type JobStatus, type PlanResult } from '@io/shared';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { DB } from '../db/db.js';
+import { encodeHevc, hasX265 } from '../convert/ffmpeg.js';
 import { moveFile } from '../fs/ops.js';
 import type { Roots } from '../fs/roots.js';
 import { HttpError } from '../http/errors.js';
@@ -18,7 +20,21 @@ type UndoEntry =
   | { t: 'tags'; file: FileRef; values: TagMap }
   | { t: 'move'; from: FileRef; to: FileRef }
   | { t: 'utimes'; file: FileRef; atimeMs: number; mtimeMs: number }
-  | { t: 'trash'; id: number };
+  | { t: 'trash'; id: number }
+  /** A converted video replaced `file`; the original is trash item `trashId`. */
+  | { t: 'replace'; file: FileRef; trashId: number };
+
+type Lane = JobInfo['lane'];
+type Note = { file?: string; message: string };
+
+/** Per-run state handed to runOp. */
+interface Run {
+  lane: Lane;
+  signal: AbortSignal;
+  notes: Note[];
+  saved: { bytes: number };
+  onProgress: (file: FileRef, pct: number) => void;
+}
 
 interface JobRow {
   id: string;
@@ -30,31 +46,47 @@ interface JobRow {
   errors: string;
   undo: string | null;
   rule_id: string | null;
+  lane: Lane;
+  notes: string;
+  saved_bytes: number;
   created_at: number;
   finished_at: number | null;
 }
 
-const toInfo = (r: JobRow): JobInfo => ({
+/** Finished jobs (also cancelled ones, for the files they did change) can be undone. */
+const canUndo = (r: JobRow) => (r.status === 'done' || r.status === 'cancelled') && !!r.undo && r.undo !== '[]';
+
+const toInfo = (r: JobRow, current: JobInfo['current']): JobInfo => ({
   id: r.id,
   title: r.title,
   status: r.status,
   total: r.total,
   done: r.done,
   errors: JSON.parse(r.errors),
+  notes: JSON.parse(r.notes),
   createdAt: r.created_at,
   finishedAt: r.finished_at,
-  undoable: r.status === 'done' && !!r.undo && r.undo !== '[]',
+  undoable: canUndo(r),
   ruleId: r.rule_id,
+  lane: r.lane,
+  current: current ?? null,
+  savedBytes: r.saved_bytes,
 });
 
 const refText = (f: FileRef) => `${f.root}/${f.rel}`;
 
 /**
- * Runs every mutation. Jobs execute one at a time (a single promise chain), so two batches
- * never touch the same files concurrently. Progress is emitted as 'job' events (SSE).
+ * Runs every mutation. Jobs execute one at a time on the main lane (a single promise chain), so two
+ * batches never touch the same files concurrently. Video conversions get their own lane so a long
+ * encode doesn't hold up everything else: encoding only reads the original, and every file change a
+ * convert-lane job makes (the final swap, its other steps) runs on the main lane via exclusive().
+ * Progress is emitted as 'job' events (SSE).
  */
 export class JobEngine extends EventEmitter {
   private chain: Promise<unknown> = Promise.resolve();
+  private convertChain: Promise<unknown> = Promise.resolve();
+  private running = new Map<string, AbortController>();
+  private current = new Map<string, NonNullable<JobInfo['current']>>();
 
   constructor(
     private db: DB,
@@ -68,11 +100,15 @@ export class JobEngine extends EventEmitter {
     super();
     // Jobs interrupted by a restart can't resume safely; mark them failed.
     db.prepare("UPDATE jobs SET status = 'failed', finished_at = ? WHERE status IN ('queued', 'running')").run(Date.now());
+    // Partial encodes left by a restart.
+    for (const { path: p } of db.prepare('SELECT path FROM convert_tmp').all() as { path: string }[]) fsSync.rmSync(p, { force: true });
+    db.prepare('DELETE FROM convert_tmp').run();
   }
 
   async plan(req: JobRequest): Promise<Plan> {
     const refs = await expandSelection(req.selection, this.roots);
-    return planJob(refs, req.steps, { roots: this.roots, indexer: this.indexer, settings: this.settings.get(), defaultTz: this.defaultTz });
+    const convertAvailable = isConvertJob(req.steps) ? await hasX265() : undefined;
+    return planJob(refs, req.steps, { roots: this.roots, indexer: this.indexer, settings: this.settings.get(), defaultTz: this.defaultTz, convertAvailable });
   }
 
   static toResult(p: Plan): PlanResult {
@@ -87,11 +123,12 @@ export class JobEngine extends EventEmitter {
     if (opts.skipIfEmpty && plan.ops.length === 0) return null;
     const title = req.title ?? req.steps.map((s) => STEP_INFO[s.type].label).join(' → ');
     const id = randomUUID();
+    const lane: Lane = isConvertJob(req.steps) ? 'convert' : 'main';
     this.db
-      .prepare('INSERT INTO jobs (id, title, status, request, total, rule_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(id, title, 'queued', JSON.stringify(req), plan.ops.length, ruleId, Date.now());
+      .prepare('INSERT INTO jobs (id, title, status, request, total, rule_id, lane, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, title, 'queued', JSON.stringify(req), plan.ops.length, ruleId, lane, Date.now());
     const planErrors = plan.items.filter((i) => i.error).map((i) => ({ file: refText(i.file), message: i.error! }));
-    this.enqueue(() => this.execute(id, plan.ops, planErrors));
+    this.enqueue(() => this.execute(id, plan.ops, planErrors, lane), lane);
     return this.get(id);
   }
 
@@ -102,25 +139,42 @@ export class JobEngine extends EventEmitter {
     return p;
   }
 
-  private enqueue(fn: () => Promise<void>) {
-    this.chain = this.chain.then(fn).catch((e) => console.error('job failed', e));
+  private enqueue(fn: () => Promise<void>, lane: Lane = 'main') {
+    if (lane === 'convert') this.convertChain = this.convertChain.then(fn).catch((e) => console.error('job failed', e));
+    else this.chain = this.chain.then(fn).catch((e) => console.error('job failed', e));
+  }
+
+  /** File changes of a convert-lane job go through the main lane; main-lane jobs are already on it. */
+  private onMain<T>(lane: Lane, fn: () => Promise<T>): Promise<T> {
+    return lane === 'convert' ? this.exclusive(fn) : fn();
   }
 
   get(id: string): JobInfo {
     const row = this.db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as JobRow | undefined;
     if (!row) throw new HttpError(404, 'Job not found');
-    return toInfo(row);
+    return toInfo(row, this.current.get(id));
   }
 
   list(limit = 50): JobInfo[] {
-    return (this.db.prepare('SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?').all(limit) as JobRow[]).map(toInfo);
+    return (this.db.prepare('SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?').all(limit) as JobRow[]).map((r) =>
+      toInfo(r, this.current.get(r.id)),
+    );
+  }
+
+  /** Stop a queued or running job. Finished ops keep their undo entries; a running encode is killed. */
+  cancel(id: string): JobInfo {
+    const job = this.get(id);
+    if (job.status === 'queued') this.update(id, { status: 'cancelled', finished_at: Date.now() });
+    else if (job.status === 'running' && this.running.has(id)) this.running.get(id)!.abort();
+    else throw new HttpError(409, 'This job is not running');
+    return this.get(id);
   }
 
   undo(id: string): JobInfo {
     const row = this.db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as JobRow | undefined;
     if (!row) throw new HttpError(404, 'Job not found');
-    if (row.status !== 'done' || !row.undo) throw new HttpError(409, 'This job cannot be undone');
-    const entries = JSON.parse(row.undo) as UndoEntry[];
+    if (!canUndo(row)) throw new HttpError(409, 'This job cannot be undone');
+    const entries = JSON.parse(row.undo!) as UndoEntry[];
     const undoId = randomUUID();
     this.db
       .prepare('INSERT INTO jobs (id, title, status, request, total, created_at) VALUES (?, ?, ?, ?, ?, ?)')
@@ -131,53 +185,114 @@ export class JobEngine extends EventEmitter {
     return this.get(undoId);
   }
 
-  private update(id: string, fields: Partial<Pick<JobRow, 'status' | 'done' | 'errors' | 'undo' | 'finished_at'>>) {
+  private update(id: string, fields: Partial<Pick<JobRow, 'status' | 'done' | 'errors' | 'notes' | 'saved_bytes' | 'undo' | 'finished_at'>>) {
     const keys = Object.keys(fields);
     this.db.prepare(`UPDATE jobs SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...keys.map((k) => (fields as Record<string, unknown>)[k]), id);
     this.emit('job', this.get(id));
   }
 
-  private async execute(id: string, ops: Op[], errors: { file?: string; message: string }[]): Promise<void> {
+  private async execute(id: string, ops: Op[], errors: Note[], lane: Lane): Promise<void> {
+    if (this.get(id).status === 'cancelled') return;
     const undo: UndoEntry[] = [];
+    const ac = new AbortController();
+    this.running.set(id, ac);
     let done = 0;
     let lastEmit = 0;
     this.update(id, { status: 'running' });
+    const run: Run = { lane, signal: ac.signal, notes: [], saved: { bytes: 0 }, onProgress: () => undefined };
     const progress = (force = false) => {
       if (force || Date.now() - lastEmit > 250) {
         lastEmit = Date.now();
-        this.update(id, { done, errors: JSON.stringify(errors) });
+        this.update(id, { done, errors: JSON.stringify(errors), notes: JSON.stringify(run.notes), saved_bytes: run.saved.bytes });
       }
     };
+    run.onProgress = (file, pct) => {
+      this.current.set(id, { file: refText(file), pct: Math.round(pct) });
+      progress();
+    };
     for (let i = 0; i < ops.length; ) {
+      if (ac.signal.aborted) break;
       const op = ops[i];
       if (op.op === 'rename') {
         // All renames of one step run together in two phases (temp names first) so swaps never collide.
         let j = i;
         while (j < ops.length && ops[j].op === 'rename' && ops[j].step === op.step) j++;
         const batch = ops.slice(i, j) as Extract<Op, { op: 'rename' }>[];
-        await this.renameBatch(batch, undo, errors);
+        await this.onMain(lane, () => this.renameBatch(batch, undo, errors));
         done += batch.length;
         i = j;
       } else {
         try {
-          await this.runOp(op, undo);
+          if (op.op === 'convert') await this.convert(op, undo, run);
+          else await this.onMain(lane, () => this.runOp(op, undo));
         } catch (e) {
-          errors.push({ file: refText(op.file), message: (e as Error).message });
+          if (!ac.signal.aborted) errors.push({ file: refText(op.file), message: (e as Error).message });
         }
-        done++;
+        this.current.delete(id);
+        if (!ac.signal.aborted) done++;
         i++;
       }
       progress();
     }
+    this.running.delete(id);
+    this.current.delete(id);
     progress(true);
     this.update(id, {
-      status: errors.length && errors.length >= ops.length && ops.length > 0 ? 'failed' : 'done',
+      status: ac.signal.aborted ? 'cancelled' : errors.length && errors.length >= ops.length && ops.length > 0 ? 'failed' : 'done',
       undo: JSON.stringify(undo),
       finished_at: Date.now(),
     });
   }
 
-  private async runOp(op: Exclude<Op, { op: 'rename' }>, undo: UndoEntry[]): Promise<void> {
+  /**
+   * Encode next to the original (same device, so the swap is a rename) while other jobs keep running,
+   * then swap on the main lane: copy all tags and the mtime over, trash the original, move the result in.
+   */
+  private async convert(op: Extract<Op, { op: 'convert' }>, undo: UndoEntry[], run: Run): Promise<void> {
+    const file = this.roots.resolve(op.file);
+    const before = await fs.stat(file.abs);
+    const ext = path.extname(file.abs);
+    const tmp = path.join(path.dirname(file.abs), `.io-convert-${randomUUID()}${ext}`);
+    this.db.prepare('INSERT INTO convert_tmp (path) VALUES (?)').run(tmp);
+    try {
+      run.onProgress(op.file, 0);
+      await encodeHevc(file.abs, tmp, {
+        crf: op.crf,
+        preset: op.preset,
+        format: ext.toLowerCase() === '.mov' ? 'mov' : 'mp4',
+        duration: op.duration,
+        signal: run.signal,
+        onProgress: (pct) => run.onProgress(op.file, pct),
+      });
+      const after = await fs.stat(tmp);
+      const pct = Math.round((1 - after.size / before.size) * 100);
+      if (pct < op.minSavingPct) {
+        run.notes.push({ file: refText(op.file), message: `Kept the original: the HEVC version was only ${pct}% smaller` });
+        return;
+      }
+      await this.exclusive(async () => {
+        const now = await fs.stat(file.abs);
+        if (now.size !== before.size || now.mtimeMs !== before.mtimeMs) throw new Error('The file changed while it was being converted; kept the original');
+        await this.metadata.copyAllFrom(file.abs, tmp);
+        await fs.utimes(tmp, before.atime, before.mtime);
+        const item = await this.trash.trash(op.file);
+        try {
+          await moveFile(tmp, file.abs);
+        } catch (e) {
+          await this.trash.restore(item.id);
+          throw e;
+        }
+        undo.push({ t: 'replace', file: op.file, trashId: item.id });
+        this.indexer.invalidate(op.file);
+      });
+      run.saved.bytes += before.size - after.size;
+    } finally {
+      await fs.rm(tmp, { force: true });
+      this.db.prepare('DELETE FROM convert_tmp WHERE path = ?').run(tmp);
+    }
+  }
+
+  private async runOp(op: Exclude<Op, { op: 'rename' | 'convert' }>, undo: UndoEntry[]): Promise<void> {
     const file = this.roots.resolve(op.file);
     switch (op.op) {
       case 'writeTags': {
@@ -215,7 +330,7 @@ export class JobEngine extends EventEmitter {
     }
   }
 
-  private async renameBatch(batch: Extract<Op, { op: 'rename' }>[], undo: UndoEntry[], errors: { file?: string; message: string }[]) {
+  private async renameBatch(batch: Extract<Op, { op: 'rename' }>[], undo: UndoEntry[], errors: Note[]) {
     const staged: { op: (typeof batch)[number]; tmp: string; src: string }[] = [];
     for (const op of batch) {
       try {
@@ -240,7 +355,7 @@ export class JobEngine extends EventEmitter {
   }
 
   private async runUndo(id: string, entries: UndoEntry[]): Promise<void> {
-    const errors: { file?: string; message: string }[] = [];
+    const errors: Note[] = [];
     this.update(id, { status: 'running' });
     let done = 0;
     for (const u of entries) {
@@ -259,6 +374,12 @@ export class JobEngine extends EventEmitter {
             break;
           case 'trash':
             await this.trash.restore(u.id);
+            break;
+          case 'replace':
+            // The converted file goes to the trash too, so undo never deletes anything.
+            await this.trash.trash(u.file);
+            this.indexer.invalidate(u.file);
+            await this.trash.restore(u.trashId);
             break;
         }
       } catch (e) {

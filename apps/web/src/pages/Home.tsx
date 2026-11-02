@@ -50,6 +50,17 @@ export function HomePage() {
             <span aria-hidden>→</span>
           </div>
         </Link>
+        <Link to="/convert" className="home-card">
+          <span className="eyebrow">Videos</span>
+          <h2 className="card-title">Convert</h2>
+          <p className="muted body-sm" style={{ margin: 0 }}>
+            Shrink large phone videos to HEVC, keeping resolution, dates, GPS and camera details.
+          </p>
+          <div className="card-foot">
+            <span />
+            <span aria-hidden>→</span>
+          </div>
+        </Link>
         <Link to="/automation" className="home-card">
           <span className="eyebrow">Rules</span>
           <h2 className="card-title">Automation</h2>

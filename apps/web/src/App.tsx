@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import { keys, useJobEvents, useMe } from './api/hooks';
 import { TopNav } from './components/TopNav';
 import { AutomationPage } from './pages/Automation';
+import { ConvertPage } from './pages/Convert';
 import { HomePage } from './pages/Home';
 import { ImmichPage } from './pages/Immich';
 import { ImportPage } from './pages/Import';
@@ -51,6 +52,7 @@ export function App() {
           {/* Old British spelling; keeps bookmarks working. */}
           <Route path="/organise" element={<Navigate to={{ pathname: '/organize', search: location.search }} replace />} />
           <Route path="/gps" element={<GpsPage />} />
+          <Route path="/convert" element={<ConvertPage />} />
           <Route path="/automation" element={<AutomationPage />} />
           <Route path="/immich" element={<ImmichPage />} />
           <Route path="/settings" element={<SettingsPage />} />

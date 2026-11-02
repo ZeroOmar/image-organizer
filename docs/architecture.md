@@ -45,14 +45,15 @@ POST /api/jobs      → plan again, insert job row, queue execute()
 POST /api/jobs/:id/undo → new job applying UndoEntries in reverse
 ```
 
-Op kinds: `writeTags` (with snapshot), `copyTags`, `rename`, `move`, `utimes`, `trash`. Jobs run one at a time (single promise chain), so batches never race. Jobs still `running` at restart are marked `failed`.
+Op kinds: `writeTags` (with snapshot), `copyTags`, `rename`, `move`, `utimes`, `trash`, `convert`. Jobs run one at a time (single promise chain), so batches never race. The exception is jobs with a `convert` step: they run on a second serial lane so hour-long encodes don't block everything else, but every file change they make goes through `exclusive()` on the main lane (see [convert.md](convert.md)). Running jobs can be cancelled between ops (and mid-encode). Jobs still `running` at restart are marked `failed`.
 
 ## SQLite schema (`db/db.ts`, append-only `MIGRATIONS`)
 
 - `sessions(id, username, created_at, expires_at)`
 - `settings(key, value JSON)`: one row `app` = `SettingsSchema`
 - `media_cache(root, rel, size, mtime_ms, meta JSON, error)`
-- `jobs(id, title, status, request JSON, total, done, errors JSON, undo JSON, rule_id, created_at, finished_at)`
+- `jobs(id, title, status, request JSON, total, done, errors JSON, undo JSON, rule_id, lane, notes JSON, saved_bytes, created_at, finished_at)`
+- `convert_tmp(path)`: temp encode files, deleted at startup
 - `trash_items(id, origin_root, original_rel, trash_rel, size, deleted_at)`
 - `rules(id, data JSON, last_run_at, last_job_id)`
 

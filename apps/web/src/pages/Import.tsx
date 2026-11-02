@@ -6,6 +6,7 @@ import { uploadFile } from '../api/client';
 import { useConfig, useJobs } from '../api/hooks';
 import { ActionDialog } from '../components/ActionDialog';
 import { FolderPicker } from '../components/FolderPicker';
+import { ConvertDialog } from '../organize/dialogs/ConvertDialog';
 import { MoveDialog, TrashDialog } from '../organize/dialogs/SimpleDialogs';
 import { actionButtons, Workspace, type BatchAction, type WorkspaceApi } from '../organize/Workspace';
 
@@ -21,9 +22,10 @@ const PARALLEL = 2;
 
 export function ImportPage() {
   const qc = useQueryClient();
-  const maxMB = useConfig().data?.maxUploadMB;
+  const config = useConfig().data;
+  const maxMB = config?.maxUploadMB;
   const [uploads, setUploads] = useState<Upload[]>([]);
-  const [dialog, setDialog] = useState<'album' | 'move' | 'trash' | null>(null);
+  const [dialog, setDialog] = useState<'album' | 'move' | 'convert' | 'trash' | null>(null);
   const [lastAlbum, setLastAlbum] = useState<{ jobId: string; rel: string } | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const folderRef = useRef('');
@@ -88,9 +90,12 @@ export function ImportPage() {
     );
   };
 
-  const actions = (): BatchAction[] => [
+  const actions = (w: WorkspaceApi): BatchAction[] => [
     { label: 'Move to album', run: () => setDialog('album'), variant: 'primary' },
     { label: 'Move within import', run: () => setDialog('move') },
+    ...(config?.convertAvailable
+      ? [{ label: 'Convert to HEVC', run: () => setDialog('convert'), disabled: !w.selected.some((e) => e.kind === 'video') }]
+      : []),
     { label: 'Trash', run: () => setDialog('trash'), variant: 'danger' },
   ];
 
@@ -101,7 +106,7 @@ export function ImportPage() {
         <span className="eyebrow" style={{ marginRight: 6 }}>
           {n ? `${n} selected` : 'Select files, or drop files here to upload'}
         </span>
-        {actionButtons(actions(), n)}
+        {actionButtons(actions(w), n)}
         <span className="grow" />
         {active.length > 0 && (
           <span className="caption muted">
@@ -127,6 +132,9 @@ export function ImportPage() {
           />
         )}
         {dialog === 'move' && <MoveDialog selection={w.selection} root="import" current={w.folder} onClose={() => setDialog(null)} />}
+        {dialog === 'convert' && (
+          <ConvertDialog selection={w.selection} count={w.selected.filter((e) => e.kind === 'video').length} onClose={() => setDialog(null)} />
+        )}
         {dialog === 'trash' && <TrashDialog selection={w.selection} count={n} onClose={() => setDialog(null)} />}
       </>
     );

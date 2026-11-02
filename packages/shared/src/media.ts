@@ -67,6 +67,18 @@ export function gatherPoint(p: GpsPoint, center: { lat: number; lon: number }, s
   return { lat: round(center.lat + (p.lat - center.lat) * scale), lon: round(center.lon + (p.lon - center.lon) * scale), alt: p.alt ?? null };
 }
 
+export type VideoCodec = 'h264' | 'hevc' | 'av1' | 'other';
+
+/** QuickTime CompressorID / sample entry → codec family. */
+export function videoCodecOf(compressorId: string | undefined): VideoCodec | undefined {
+  if (!compressorId) return undefined;
+  const id = compressorId.trim().toLowerCase();
+  if (id === 'avc1' || id === 'avc3' || id === 'h264') return 'h264';
+  if (id === 'hvc1' || id === 'hev1' || id === 'hevc' || id === 'dvh1' || id === 'dvhe') return 'hevc';
+  if (id === 'av01') return 'av1';
+  return 'other';
+}
+
 /** Normalized metadata read from a file by ExifTool. Raw date strings are kept as ExifTool prints them. */
 export interface MediaMeta {
   width?: number;
@@ -81,6 +93,10 @@ export interface MediaMeta {
   focalLength35?: number;
   orientation?: number;
   duration?: number;
+  /** Video: normalized codec of the first video track. */
+  videoCodec?: VideoCodec;
+  /** Video: average bitrate in bits per second. */
+  bitrate?: number;
   /** Photo: EXIF DateTimeOriginal, local wall time "YYYY:MM:DD HH:MM:SS". */
   dateTimeOriginal?: string;
   /** Photo: EXIF CreateDate (local wall time). */

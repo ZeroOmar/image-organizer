@@ -13,6 +13,8 @@
 | `qtCreateDate` | — | QuickTime CreateDate (**UTC**) |
 | `qtCreationDate` | — | Keys:CreationDate (local + offset) |
 | `gps` | Composite GPSLatitude/Longitude/Altitude (signed) | same (from GPSCoordinates) |
+| `videoCodec` | — | CompressorID → `h264`/`hevc`/`av1`/`other` (`videoCodecOf`) |
+| `bitrate` | — | Composite AvgBitrate (bps) |
 
 Invalid dates (`0000:00:00…`) are dropped. Raw values may carry sub-seconds (`…:04.100`); compare to the second.
 

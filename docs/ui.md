@@ -15,10 +15,11 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 | Route | Page |
 |---|---|
 | `/login` | `Login` |
-| `/` | `Home`: cards Import (pending count), Organize (green), Automation, Immich (TBA, disabled), Settings |
+| `/` | `Home`: cards Import (pending count), Organize (green), GPS, Convert, Automation, Immich (TBA, disabled), Settings |
 | `/import` | `Import`: Workspace on root `import` + Upload/drag-drop + Move to album |
 | `/organize?path=` | `Organize`: Workspace on root `media` + batch bar |
 | `/gps?root=&path=` | `Gps`: Workspace with a file list + map (root `media`, or `import` with `?root=import`) |
+| `/convert?root=&path=` | `Convert`: Workspace with a video table (codec, bitrate, size, candidate status) + Conversion pane (totals, progress with Cancel, savings); see [convert.md](convert.md) |
 | `/automation` | rules list + editor + dry run |
 | `/trash` | restore / delete / empty |
 | `/settings` | dynamic settings + read-only static config |
@@ -65,6 +66,10 @@ Uses the same `Workspace`, with two of its panes swapped out: `sidePane` puts th
 - Map applies run through `runJobAndWait()` right away, without a dry-run table, and can be undone from the Jobs menu. The batch bar's **Set GPS…**, **Tighten…** and **Clear GPS** use the usual `ActionDialog` dry run.
 - Place search (Nominatim) is `components/PlaceSearch.tsx`, which the GPS dialog uses too.
 
+## Convert page (`src/pages/Convert.tsx`)
+
+Like the GPS page, it swaps two Workspace panes: `content` is a table of the folder's videos (thumbnail, length, resolution, codec, bitrate, size, Candidate/Already efficient/Low bitrate pill), filtered to **Candidates** by default, and `sidePane` is **Conversion** (candidate count and size, running conversions with % progress and **Cancel**, recent savings). Candidate rules come from `convertSkipReason()` in shared, the same function the planner uses. Rows click-select and right-click like grid tiles. **Select candidates** selects every candidate; **Convert to HEVC** opens `ConvertDialog` (quality CRF presets + slider, encoder preset), which Organize and Import use too.
+
 ## Copy metadata dialog
 
 The source is picked from a comparison table: one row per selected file (thumbnail, name, radio), one column per tag that will be copied. Values come from `/api/metadata` (`useMetadataMany`). Click a row to make it the source; target cells that differ from the source are highlighted because the copy will change them. The table shows at most 50 files (one ExifTool read each).
@@ -75,7 +80,7 @@ A file with GPS opens on its position. Otherwise the dialog asks for the browser
 
 ## Batch actions
 
-Every action dialog wraps `components/ActionDialog.tsx`: form → **Preview changes** (`/api/jobs/plan`, `PlanTable`) → **Apply** (`/api/jobs`). Progress, Undo and Dismiss live in the header `JobsMenu` (`components/JobsMenu.tsx`, SSE-fed; dismissals persist in localStorage; running jobs can't be dismissed). Dialogs live in `src/organize/dialogs/`.
+Every action dialog wraps `components/ActionDialog.tsx`: form → **Preview changes** (`/api/jobs/plan`, `PlanTable`) → **Apply** (`/api/jobs`). Progress (plus the current file's % for conversions), Cancel (convert lane), Undo and Dismiss live in the header `JobsMenu` (`components/JobsMenu.tsx`, SSE-fed; dismissals persist in localStorage; running jobs can't be dismissed). Dialogs live in `src/organize/dialogs/`.
 
 ## Data hooks (`src/api/hooks.ts`)
 

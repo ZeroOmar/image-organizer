@@ -27,6 +27,10 @@ export const COPY_GROUPS = {
 } as const;
 export type CopyGroup = keyof typeof COPY_GROUPS;
 
+/** libx265 presets, fastest first. Slower = smaller file at the same quality. */
+export const CONVERT_PRESETS = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'] as const;
+export type ConvertPreset = (typeof CONVERT_PRESETS)[number];
+
 const tagValue = z.union([z.string(), z.number(), z.array(z.string()), z.null()]);
 
 export const StepSchema = z.discriminatedUnion('type', [
@@ -63,6 +67,12 @@ export const StepSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('move'), dest: FileRefSchema }),
   z.object({ type: z.literal('moveByDate'), pattern: z.string().min(1) }),
   z.object({ type: z.literal('trash') }),
+  z.object({
+    type: z.literal('convert'),
+    /** libx265 quality; unset = Settings → Video conversion. */
+    crf: z.number().int().min(0).max(51).optional(),
+    preset: z.enum(CONVERT_PRESETS).optional(),
+  }),
 ]);
 export type Step = z.infer<typeof StepSchema>;
 export type StepType = Step['type'];
@@ -82,7 +92,11 @@ export const STEP_INFO: Record<StepType, { label: string; description: string; a
   move: { label: 'Move', description: 'Move files to a folder', automation: true },
   moveByDate: { label: 'Move into dated folders', description: 'Move into /media folders like {YYYY}/{MM}', automation: true },
   trash: { label: 'Trash', description: 'Move files to the trash', automation: false },
+  convert: { label: 'Convert to HEVC', description: 'Re-encode videos to HEVC, keeping resolution and metadata; originals go to the trash', automation: true },
 };
+
+/** Steps that run on the convert lane (long CPU-bound encodes) instead of the main job queue. */
+export const isConvertJob = (steps: Step[]) => steps.some((s) => s.type === 'convert');
 
 export const SelectionSchema = z.union([
   z.object({ files: z.array(FileRefSchema).min(1) }),
@@ -112,7 +126,7 @@ export interface PlanResult {
   fileCount: number;
 }
 
-export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'undone';
+export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'undone' | 'cancelled';
 
 export interface JobInfo {
   id: string;
@@ -121,10 +135,18 @@ export interface JobInfo {
   total: number;
   done: number;
   errors: { file?: string; message: string }[];
+  /** Per-file outcomes that aren't errors, e.g. "kept the original: only 8% smaller". */
+  notes: { file?: string; message: string }[];
   createdAt: number;
   finishedAt: number | null;
   undoable: boolean;
   ruleId?: string | null;
+  /** 'convert' jobs run on their own lane so long encodes don't block other jobs. */
+  lane: 'main' | 'convert';
+  /** The file being converted right now, with encode progress 0–100 (convert lane only). */
+  current?: { file: string; pct: number } | null;
+  /** Bytes saved by finished conversions in this job. */
+  savedBytes?: number;
 }
 
 export interface EnrichedEntry extends MediaEntry {
@@ -174,4 +196,6 @@ export interface PublicConfig {
   maxUploadMB: number;
   trashRetentionDays: number;
   roots: Record<'media' | 'import' | 'trash', string>;
+  /** False when ffmpeg has no libx265 encoder; the Convert feature is hidden. */
+  convertAvailable: boolean;
 }

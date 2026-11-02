@@ -37,6 +37,8 @@ export interface BatchAction {
   variant?: 'primary' | 'danger';
   /** Minimum number of selected files (default 1). */
   min?: number;
+  /** Disabled regardless of the selection size (e.g. no videos selected). */
+  disabled?: boolean;
 }
 
 export function actionButtons(actions: BatchAction[], selected: number) {
@@ -44,7 +46,7 @@ export function actionButtons(actions: BatchAction[], selected: number) {
     <button
       key={a.label}
       className={`btn btn-sm ${a.variant ? `btn-${a.variant}` : ''}`}
-      disabled={selected < (a.min ?? 1)}
+      disabled={a.disabled || selected < (a.min ?? 1)}
       onClick={a.run}
     >
       {a.label}
@@ -219,7 +221,7 @@ export function Workspace({
     ...(actions?.(api) ?? []).map((a) => ({
       label: a.label,
       onSelect: a.run,
-      disabled: selected.length < (a.min ?? 1),
+      disabled: a.disabled || selected.length < (a.min ?? 1),
       danger: a.variant === 'danger',
     })),
     { label: 'Select all', onSelect: () => setSelection(new Set(visible.map((e) => e.rel))), separator: true },

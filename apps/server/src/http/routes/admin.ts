@@ -2,6 +2,7 @@ import type { PublicConfig } from '@io/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { AppContext } from '../../context.js';
+import { hasX265 } from '../../convert/ffmpeg.js';
 import { APP_VERSION } from '../../version.js';
 import { parse } from '../validate.js';
 
@@ -16,6 +17,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AppContext) {
     maxUploadMB: ctx.config.import.maxUploadMB,
     trashRetentionDays: ctx.settings.get().trash.retentionDays ?? ctx.config.trash.retentionDays,
     roots: ctx.roots.dirs,
+    convertAvailable: await hasX265(),
   }));
 
   /** Static config with secrets masked, for the read-only view in Settings. */

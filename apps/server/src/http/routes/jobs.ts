@@ -16,6 +16,9 @@ export function jobRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.post<{ Params: { id: string } }>('/api/jobs/:id/undo', async (req) => ctx.jobs.undo(req.params.id));
 
+  /** Stop a queued or running job (kills a running ffmpeg encode). Ops already done stay undoable. */
+  app.post<{ Params: { id: string } }>('/api/jobs/:id/cancel', async (req) => ctx.jobs.cancel(req.params.id));
+
   /** Server-sent events: every job update (progress, status). */
   app.get('/api/events', (req, reply) => {
     reply.raw.writeHead(200, {

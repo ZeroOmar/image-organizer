@@ -1,6 +1,6 @@
-import type { JobInfo } from '@io/shared';
+import { formatBytes, type JobInfo } from '@io/shared';
 import { useEffect, useRef, useState } from 'react';
-import { undoJob, useJobs } from '../api/hooks';
+import { cancelJob, undoJob, useJobs } from '../api/hooks';
 
 const STORE = 'io.dismissedJobs';
 
@@ -121,6 +121,8 @@ function JobRow({ job, onDismiss }: { job: JobInfo; onDismiss: () => void }) {
       <span className="pill pill-error">Failed</span>
     ) : job.status === 'undone' ? (
       <span className="pill">Undone</span>
+    ) : job.status === 'cancelled' ? (
+      <span className="pill">Cancelled</span>
     ) : (
       <span className="pill">{job.status === 'queued' ? 'Queued' : `${job.done}/${job.total}`}</span>
     );
@@ -136,6 +138,28 @@ function JobRow({ job, onDismiss }: { job: JobInfo; onDismiss: () => void }) {
         <div className="progress">
           <div style={{ width: `${pct}%` }} />
         </div>
+      )}
+      {job.current && (
+        <div className="row caption" style={{ gap: 6, flexWrap: 'nowrap' }}>
+          <span className="grow muted job-title" title={job.current.file}>
+            {job.current.file.split('/').pop()}
+          </span>
+          <span className="mono">{job.current.pct}%</span>
+        </div>
+      )}
+      {!active && !!job.savedBytes && <span className="caption muted">Saved {formatBytes(job.savedBytes)}</span>}
+      {job.notes?.length > 0 && (
+        <details className="caption">
+          <summary className="muted">{job.notes.length} note{job.notes.length === 1 ? '' : 's'}</summary>
+          <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+            {job.notes.slice(0, 20).map((e, i) => (
+              <li key={i}>
+                {e.file && <span className="mono">{e.file}: </span>}
+                {e.message}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
       {job.status === 'done' && job.total === 0 && <span className="caption muted">Nothing needed changing.</span>}
       {job.errors.length > 0 && (
@@ -164,6 +188,18 @@ function JobRow({ job, onDismiss }: { job: JobInfo; onDismiss: () => void }) {
               }}
             >
               Undo
+            </button>
+          )}
+          {active && job.lane === 'convert' && (
+            <button
+              className="btn btn-sm btn-danger"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                await cancelJob(job.id).catch(() => undefined);
+              }}
+            >
+              Cancel
             </button>
           )}
           {!active && (
