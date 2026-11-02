@@ -46,6 +46,7 @@ The result carries `local`, `tz`, `offset`, `utcMs`, `source`, `tzSource` and `t
 - **GPS, videos**: `Keys:GPSCoordinates` + `UserData:GPSCoordinates` = `"lat lon alt"` with `-n`.
 - `setGps` and `gatherGps` (tighten a cluster, from the GPS page) both write through `gpsTags()`. `gatherGps` computes each new point with the shared `gatherPoint()` and keeps the file's altitude.
 - All writes use `-overwrite_original -P`. File mtime is preserved; "Sync file dates" sets it explicitly.
+- **Broken EXIF pointers**: some apps leave EXIF offsets (e.g. IFD0 `OtherImageStart`) that point past the end of the file, and ExifTool then refuses every write with "Error reading OtherImageStart data in IFD0" (not ignorable with `-m`). `Metadata.write()`/`copyFrom()` catch that error, rebuild the metadata once (`-all= -tagsFromFile @ -all:all -unsafe -icc_profile`, ExifTool FAQ 20: every readable tag, the maker notes and the ICC profile are kept; only the dangling pointer is dropped) and retry. The job records a note ("Repaired broken EXIF …").
 
 ## Undo snapshots
 

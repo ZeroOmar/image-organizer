@@ -4,6 +4,19 @@ import { ExifTool, type WriteTags } from 'exiftool-vendored';
 export type TagValue = string | number | string[] | null;
 export type TagMap = Record<string, TagValue>;
 
+/**
+ * ExifTool refuses to write a file whose EXIF points at image data that isn't there, e.g.
+ * "Error reading OtherImageStart data in IFD0" (some phone and editing apps write such pointers).
+ * Not ignorable with -m; rebuilding the metadata (ExifTool FAQ 20) drops the dangling pointer.
+ */
+const BROKEN_POINTER = /Error reading \w+ data in (?:IFD\d|ExifIFD|SubIFD\d*|GPS|InteropIFD)\b/;
+
+/** What a write had to do beyond writing the tags. */
+export interface WriteResult {
+  /** The EXIF structure was rebuilt first (message for the job's notes). */
+  repaired?: string;
+}
+
 /** "Group:Tag" or "Tag"; letters, digits, dash and underscore only. */
 export const TAG_NAME = /^(?:[A-Za-z][\w-]*:)?[A-Za-z][\w-]*$/;
 
@@ -97,20 +110,40 @@ export class Metadata {
     return out;
   }
 
-  async write(abs: string, tags: TagMap, opts: { numeric?: boolean } = {}): Promise<void> {
+  /**
+   * Run a write; if ExifTool rejects the file for a dangling EXIF data pointer, rebuild its
+   * metadata once (all readable tags, maker notes and ICC profile are kept) and retry.
+   */
+  private async withRepair<T>(abs: string, fn: () => Promise<T>): Promise<{ value: T; repaired?: string }> {
+    try {
+      return { value: await fn() };
+    } catch (e) {
+      const m = BROKEN_POINTER.exec((e as Error).message);
+      if (!m) throw e;
+      await this.et.write(abs, {}, { writeArgs: ['-overwrite_original', '-P', '-all=', '-tagsFromFile', '@', '-all:all', '-unsafe', '-icc_profile'] });
+      const repaired = `Repaired broken EXIF before writing (${m[0].replace('Error reading ', '')} pointed outside the file)`;
+      return { value: await fn(), repaired };
+    }
+  }
+
+  async write(abs: string, tags: TagMap, opts: { numeric?: boolean } = {}): Promise<WriteResult> {
     for (const k of Object.keys(tags)) if (!TAG_NAME.test(k)) throw new Error(`Invalid tag name: ${k}`);
     const writeArgs = ['-overwrite_original', '-P', ...(opts.numeric ? ['-n'] : [])];
-    const res = await this.et.write(abs, tags as WriteTags, { writeArgs });
+    const { value: res, repaired } = await this.withRepair(abs, () => this.et.write(abs, tags as WriteTags, { writeArgs }));
     // ExifTool reports "unchanged" (not an error) for tags it can't write, e.g. Composite:*.
     // Clearing an already-empty tag is also "unchanged", which is fine, so only fail when a value was set.
     if (res.updated + res.created === 0 && Object.values(tags).some((v) => v !== null)) {
       throw new Error(res.warnings?.join('; ') || 'Nothing was written — the tag may be read-only');
     }
+    return { repaired };
   }
 
-  async copyFrom(source: string, target: string, tags: string[]): Promise<void> {
+  async copyFrom(source: string, target: string, tags: string[]): Promise<WriteResult> {
     for (const k of tags) if (!TAG_NAME.test(k)) throw new Error(`Invalid tag name: ${k}`);
-    await this.et.write(target, {}, { writeArgs: ['-overwrite_original', '-P', '-tagsFromFile', source, ...tags.map((t) => `-${t}`)] });
+    const { repaired } = await this.withRepair(target, () =>
+      this.et.write(target, {}, { writeArgs: ['-overwrite_original', '-P', '-tagsFromFile', source, ...tags.map((t) => `-${t}`)] }),
+    );
+    return { repaired };
   }
 
   /**

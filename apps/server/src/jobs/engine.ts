@@ -224,7 +224,7 @@ export class JobEngine extends EventEmitter {
       } else {
         try {
           if (op.op === 'convert') await this.convert(op, undo, run);
-          else await this.onMain(lane, () => this.runOp(op, undo));
+          else await this.onMain(lane, () => this.runOp(op, undo, run.notes));
         } catch (e) {
           if (!ac.signal.aborted) errors.push({ file: refText(op.file), message: (e as Error).message });
         }
@@ -292,19 +292,20 @@ export class JobEngine extends EventEmitter {
     }
   }
 
-  private async runOp(op: Exclude<Op, { op: 'rename' | 'convert' }>, undo: UndoEntry[]): Promise<void> {
+  private async runOp(op: Exclude<Op, { op: 'rename' | 'convert' }>, undo: UndoEntry[], notes: Note[]): Promise<void> {
     const file = this.roots.resolve(op.file);
+    const note = (r: { repaired?: string }) => r.repaired && notes.push({ file: refText(op.file), message: r.repaired });
     switch (op.op) {
       case 'writeTags': {
         const values = await this.metadata.snapshot(file.abs, op.snapshot);
-        await this.metadata.write(file.abs, op.tags, { numeric: op.numeric });
+        note(await this.metadata.write(file.abs, op.tags, { numeric: op.numeric }));
         undo.push({ t: 'tags', file: op.file, values });
         this.indexer.invalidate(op.file);
         return;
       }
       case 'copyTags': {
         const values = await this.metadata.snapshot(file.abs, op.tags);
-        await this.metadata.copyFrom(this.roots.resolve(op.source).abs, file.abs, op.tags);
+        note(await this.metadata.copyFrom(this.roots.resolve(op.source).abs, file.abs, op.tags));
         undo.push({ t: 'tags', file: op.file, values });
         this.indexer.invalidate(op.file);
         return;

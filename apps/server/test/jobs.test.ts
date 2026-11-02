@@ -152,6 +152,39 @@ describe('jobs', () => {
     expect(exif(media('Trips/Bikers/MOV_0001.mov'), 'GPSLatitude').GPSLatitude).toBeUndefined();
   });
 
+  it('repairs a dangling EXIF image pointer ("Error reading OtherImageStart data in IFD0") and sets GPS', async () => {
+    // IFD0 with Make plus OtherImageStart/Length pointing far past the end of the file.
+    const make = Buffer.from('Phone\0');
+    const ifd = Buffer.alloc(2 + 3 * 12 + 4);
+    ifd.writeUInt16LE(3, 0);
+    [
+      [0x010f, 2, make.length, 8 + ifd.length],
+      [0x0201, 4, 1, 500_000],
+      [0x0202, 4, 1, 20_000],
+    ].forEach(([tag, type, count, value], i) => {
+      ifd.writeUInt16LE(tag, 2 + i * 12);
+      ifd.writeUInt16LE(type, 4 + i * 12);
+      ifd.writeUInt32LE(count, 6 + i * 12);
+      ifd.writeUInt32LE(value, 10 + i * 12);
+    });
+    const app1 = Buffer.concat([Buffer.from('Exif\0\0'), Buffer.from('II*\0'), Buffer.from([8, 0, 0, 0]), ifd, make]);
+    const head = Buffer.from([0xff, 0xe1, 0, 0]);
+    head.writeUInt16BE(app1.length + 2, 2);
+    const jpg = execFileSync('exiftool', ['-all=', '-o', '-', media('Trips/Bikers/DSC_0420.jpg')]);
+    const rel = 'Trips/Bikers/broken_pointer.jpg';
+    fs.writeFileSync(media(rel), Buffer.concat([jpg.subarray(0, 2), head, app1, jpg.subarray(2)]));
+    expect(() => execFileSync('exiftool', ['-o', path.join(tmp, 'probe.jpg'), '-GPSLatitude=1', media(rel)], { stdio: 'pipe' })).toThrow(/OtherImageStart/);
+
+    const job = await runJob({ selection: { files: [{ root: 'media', rel }] }, steps: [{ type: 'setGps', lat: 1.5, lon: 2.5 }] });
+    expect(job.errors).toEqual([]);
+    expect(job.notes[0].message).toMatch(/^Repaired broken EXIF/);
+    expect(exif(media(rel), 'Make', 'GPSLatitude', 'GPSLongitude', 'OtherImageStart')).toMatchObject({ Make: 'Phone', GPSLatitude: 1.5, GPSLongitude: 2.5 });
+    expect(exif(media(rel), 'OtherImageStart').OtherImageStart).toBeUndefined();
+    await waitJob((await api<JobInfo>('POST', `/api/jobs/${job.id}/undo`)).id);
+    expect(exif(media(rel), 'GPSLatitude').GPSLatitude).toBeUndefined();
+    fs.rmSync(media(rel));
+  });
+
   it('undo restores previous GPS values', async () => {
     const rel = 'Trips/Bikers/IMG_0001.jpg';
     const job = await runJob({ selection: { files: [{ root: 'media', rel }] }, steps: [{ type: 'setGps', lat: 1, lon: 2 }] });

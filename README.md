@@ -21,6 +21,7 @@ It automates a manual Adobe Bridge workflow: open a folder → check *Date Time 
 - **Issue highlighting** (optional): yellow outline for missing metadata, red for mismatched dates, plus a badge and tooltip listing the issues. Each check can be toggled.
 - **Filters**: issues, file type, media kind, month, date source, UTC offset, timezone source, GPS, camera make/model, orientation, ISO, aperture, exposure, focal length.
 - **Import**: a separate `/import` mount for incoming media, plus a browser **Upload** button and drag and drop. **Move to album** can also write dates and rename inside the album.
+- **Convert videos**: shrink large phone videos by re-encoding them to **HEVC (H.265)** at the same resolution, typically 3–10× smaller. Dates, timezone, GPS, camera make/model and audio are kept. Videos that are already HEVC/AV1 or low bitrate are skipped, and the original goes to the trash, so Undo works. A dedicated **Convert** page lists codec, bitrate and size; it's also a batch action and an automation step. Encodes run on their own queue with live progress and Cancel.
 - **Automation**: saved rule pipelines that run on demand, on a **cron schedule**, or **when files arrive** in a watched folder, with a dry run.
 - **Safe by design**:
   - every change is shown as a **dry run** before it applies
@@ -135,6 +136,7 @@ Saved in the SQLite database under `/app` and edited on the **Settings** page:
 - extension map
 - issue highlighting (on/off, per check, mismatch tolerance)
 - trash retention override
+- video conversion defaults (quality CRF, encoder preset, which videos to skip)
 
 The page also shows the static config read-only, with secrets masked.
 
@@ -244,6 +246,7 @@ All endpoints are under `/api` and require the session cookie from login. Every 
 | POST | `/api/jobs` | Run steps on a selection |
 | GET | `/api/jobs` · `/api/jobs/{id}` | Job status |
 | POST | `/api/jobs/{id}/undo` | Undo a job |
+| POST | `/api/jobs/{id}/cancel` | Cancel a queued or running job (e.g. a long video conversion) |
 | GET | `/api/events` | Server-sent job updates |
 
 ### Import, trash, settings, rules
@@ -313,6 +316,7 @@ image-organizer/
 │   │   │   ├── metadata/       # ExifTool wrapper + date/GPS tag builders
 │   │   │   ├── index/          # SQLite metadata cache, resolved dates, issues
 │   │   │   ├── jobs/           # Planner (dry run) + serial engine with undo
+│   │   │   ├── convert/        # ffmpeg HEVC encoder (video conversion)
 │   │   │   ├── thumbs/         # sharp / ffmpeg / embedded-JPEG thumbnails
 │   │   │   ├── trash/          # /trash with restore + retention
 │   │   │   ├── automation/     # Rules: cron (croner) + folder watch (chokidar)
@@ -353,6 +357,10 @@ docker run --rm ghcr.io/zeroomar/image-organizer:latest node -e \
 
 **HEIC thumbnails are missing**: the server tries sharp, then ffmpeg, then the JPEG preview embedded in the file. A HEIC without an embedded preview that ffmpeg can't decode shows no thumbnail; its metadata can still be edited.
 
+**Writing metadata failed with "Error reading OtherImageStart data in IFD0"** (fixed in 0.5.0): the file's EXIF points at image data that isn't in the file. The app now rebuilds the file's metadata (keeping every readable tag) and retries, and notes this on the job.
+
+**Convert is missing or says it's unavailable**: the server's ffmpeg has no libx265 encoder. The Docker image includes it; for a local run, install an ffmpeg built with x265 (`brew install ffmpeg`).
+
 **A tag edit fails with "Nothing was written"**: that tag is read-only for this file type (e.g. `Composite:*`, `File:*`).
 
 **Changes made outside the app don't show**: the metadata cache is keyed by file size + modified time. A change that keeps both (e.g. `exiftool -P`) is picked up after you restart the app or delete `/app/data/app.db`.
@@ -373,7 +381,8 @@ The tag also becomes the app version shown on the Home and Settings pages and in
 ## Limitations
 
 - Single admin account (no users/RBAC)
-- One job at a time (sequential queue by design, so batches never race on the same files)
+- One job at a time (sequential queue by design, so batches never race on the same files). Video conversions encode on a second queue, but their file changes still go through the main one.
+- Video conversion is CPU-only (no GPU encoding); 1080p at the default preset runs at about real time or slower
 - Folder listings read metadata on first open, which takes a few seconds for very large folders (aimed at libraries under ~10k files)
 - No RAW formats yet (JPEG, PNG, WebP, HEIC, MP4, MOV)
 - Immich integration is planned (TBA)
