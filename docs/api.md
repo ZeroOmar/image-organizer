@@ -32,11 +32,20 @@ All routes are under `/api`. Auth: signed `io_session` cookie. Every non-GET req
 | `GET /jobs/:id` | `JobInfo` |
 | `POST /jobs/:id/undo` | `JobInfo` of the undo job (`done` or `cancelled` jobs with undo entries) |
 | `POST /jobs/:id/cancel` | `JobInfo`; stops a queued or running job (kills a running ffmpeg encode); 409 otherwise |
-| `GET /events` | SSE, `event: job` with `JobInfo` on every update |
+| `GET /events` | SSE, `event: job` with `JobInfo` on every update, and `event: scan` with `DupeScan` (no `groups`) for duplicate-scan progress |
 
 `JobRequest = { title?, selection: {files: FileRef[]} | {folder: FileRef, recursive?}, steps: Step[] }`.
 
 `JobInfo` also carries `lane` (`main` | `convert`), `current` (`{file, pct}` while a video is encoding), `notes` (per-file outcomes that aren't errors) and `savedBytes`. `/config` includes `convertAvailable` (ffmpeg has libx265).
+
+## Duplicates
+| | |
+|---|---|
+| `POST /dupes/scan` `{folder: FileRef, recursive?, mode: exact\|near\|similar, threshold?}` | `DupeScan` (running); 409 while another scan runs |
+| `GET /dupes/scan?threshold` | latest `DupeScan` with `groups: DupeGroup[]` (`{files: EnrichedEntry[], keep, similarity}`), or `null`. `threshold` regroups a finished near/similar scan; files gone since the scan are left out |
+| `POST /dupes/cancel` | `DupeScan` or `null` |
+
+Scanning is read-only; resolving a group is a normal `trash` job. See [duplicates.md](duplicates.md). `/config` includes `similarAvailable`.
 
 ## Import
 | | |

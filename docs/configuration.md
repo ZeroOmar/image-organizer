@@ -29,7 +29,13 @@ map:
   tileUrl: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
   attribution: "© OpenStreetMap contributors"
   nominatimUrl: "https://nominatim.openstreetmap.org"
+similar:                         # Duplicates → Similar scene (CLIP image model)
+  enabled: true
+  modelUrl: "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model_quantized.onnx"
+  # modelPath: /app/models/clip.onnx   # use a local copy instead of downloading (offline installs)
 ```
+
+The model (~90 MB) is downloaded on the first similar-scene scan to `/app/cache/models/`. See [duplicates.md](duplicates.md).
 
 The Settings page shows this config read-only, with secrets masked (`GET /api/config/static`).
 

@@ -1,4 +1,4 @@
-import { JobRequestSchema, type JobInfo } from '@io/shared';
+import { JobRequestSchema, type DupeScan, type JobInfo } from '@io/shared';
 import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../../context.js';
 import { JobEngine } from '../../jobs/engine.js';
@@ -19,7 +19,7 @@ export function jobRoutes(app: FastifyInstance, ctx: AppContext) {
   /** Stop a queued or running job (kills a running ffmpeg encode). Ops already done stay undoable. */
   app.post<{ Params: { id: string } }>('/api/jobs/:id/cancel', async (req) => ctx.jobs.cancel(req.params.id));
 
-  /** Server-sent events: every job update (progress, status). */
+  /** Server-sent events: every job update (progress, status) and duplicate-scan progress. */
   app.get('/api/events', (req, reply) => {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -29,11 +29,14 @@ export function jobRoutes(app: FastifyInstance, ctx: AppContext) {
     });
     reply.raw.write(': connected\n\n');
     const send = (job: JobInfo) => reply.raw.write(`event: job\ndata: ${JSON.stringify(job)}\n\n`);
+    const sendScan = (scan: DupeScan) => reply.raw.write(`event: scan\ndata: ${JSON.stringify(scan)}\n\n`);
     const ping = setInterval(() => reply.raw.write(': ping\n\n'), 25_000);
     ctx.jobs.on('job', send);
+    ctx.dupes.on('scan', sendScan);
     req.raw.on('close', () => {
       clearInterval(ping);
       ctx.jobs.off('job', send);
+      ctx.dupes.off('scan', sendScan);
     });
   });
 }

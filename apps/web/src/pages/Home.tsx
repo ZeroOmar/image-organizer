@@ -18,7 +18,7 @@ export function HomePage() {
       </div>
       <div className="home-grid">
         <Link to="/import" className="home-card">
-          <span className="eyebrow">Step 1 · Ingest</span>
+          <span className="eyebrow">Ingest</span>
           <h2 className="card-title">Import</h2>
           <p className="muted body-sm" style={{ margin: 0 }}>
             Upload or collect incoming media and move it into an album.
@@ -29,7 +29,7 @@ export function HomePage() {
           </div>
         </Link>
         <Link to="/organize" className="home-card nomad">
-          <span className="eyebrow">Step 2 · Fix &amp; rename</span>
+          <span className="eyebrow">Fix &amp; rename</span>
           <h2 className="card-title">Organize</h2>
           <p className="muted body-sm" style={{ margin: 0 }}>
             Browse folders, fix dates, timezones and GPS, and rename by template.
@@ -55,6 +55,17 @@ export function HomePage() {
           <h2 className="card-title">Convert</h2>
           <p className="muted body-sm" style={{ margin: 0 }}>
             Shrink large phone videos to HEVC, keeping resolution, dates, GPS and camera details.
+          </p>
+          <div className="card-foot">
+            <span />
+            <span aria-hidden>→</span>
+          </div>
+        </Link>
+        <Link to="/duplicates" className="home-card">
+          <span className="eyebrow">Clean up</span>
+          <h2 className="card-title">Duplicates</h2>
+          <p className="muted body-sm" style={{ margin: 0 }}>
+            Find exact copies, resized social-media copies and similar shots, keep the best and trash the rest.
           </p>
           <div className="card-foot">
             <span />

@@ -1,4 +1,6 @@
 import type {
+  DupeScan,
+  DupeScanRequest,
   FolderListing,
   JobInfo,
   JobRequest,
@@ -25,6 +27,7 @@ export const keys = {
   trash: ['trash'] as const,
   rules: ['rules'] as const,
   importCount: ['importCount'] as const,
+  dupes: (threshold?: number) => ['dupes', threshold ?? null] as const,
 };
 
 export const useMe = () =>
@@ -81,6 +84,16 @@ export const useRules = () => useQuery({ queryKey: keys.rules, queryFn: () => ap
 export const useImportCount = () =>
   useQuery({ queryKey: keys.importCount, queryFn: () => api<{ count: number }>('/api/import/count'), refetchInterval: 30_000 });
 
+/** The latest duplicate scan with its groups; `threshold` regroups a finished near/similar scan. */
+export const useDupeScan = (threshold?: number) =>
+  useQuery({
+    queryKey: keys.dupes(threshold),
+    queryFn: () => api<DupeScan | null>(`/api/dupes/scan?${qs({ threshold })}`),
+    placeholderData: (prev) => prev,
+  });
+export const startDupeScan = (req: DupeScanRequest) => api<DupeScan>('/api/dupes/scan', { method: 'POST', body: req });
+export const cancelDupeScan = () => api<DupeScan | null>('/api/dupes/cancel', { method: 'POST' });
+
 export const planJob = (req: JobRequest) => api<PlanResult>('/api/jobs/plan', { method: 'POST', body: req });
 export const submitJob = (req: JobRequest) => api<JobInfo>('/api/jobs', { method: 'POST', body: req });
 export const undoJob = (id: string) => api<JobInfo>(`/api/jobs/${id}/undo`, { method: 'POST' });
@@ -99,10 +112,10 @@ export async function runJobAndWait(req: JobRequest): Promise<JobInfo> {
 
 /** After any job finishes, files may have moved/changed everywhere: refresh what depends on them. */
 export function invalidateFiles(qc: QueryClient) {
-  for (const k of ['folder', 'tree', 'metadata', 'trash', 'importCount', 'rules']) qc.invalidateQueries({ queryKey: [k] });
+  for (const k of ['folder', 'tree', 'metadata', 'trash', 'importCount', 'rules', 'dupes']) qc.invalidateQueries({ queryKey: [k] });
 }
 
-/** Live job updates over SSE; keeps the jobs list in the query cache current. */
+/** Live job updates and duplicate-scan progress over SSE; keeps the query cache current. */
 export function useJobEvents(enabled: boolean) {
   const qc = useQueryClient();
   useEffect(() => {
@@ -115,6 +128,12 @@ export function useJobEvents(enabled: boolean) {
         return [job, ...rest].sort((a, b) => b.createdAt - a.createdAt);
       });
       if (job.status === 'done' || job.status === 'failed' || job.status === 'cancelled') invalidateFiles(qc);
+    });
+    es.addEventListener('scan', (ev) => {
+      const scan = JSON.parse((ev as MessageEvent).data) as DupeScan;
+      // Progress carries no groups: keep the ones shown until the finished scan is fetched.
+      qc.setQueriesData<DupeScan | null>({ queryKey: ['dupes'] }, (prev) => ({ ...scan, groups: prev?.id === scan.id ? prev.groups : [] }));
+      if (scan.status !== 'running') qc.invalidateQueries({ queryKey: ['dupes'] });
     });
     return () => es.close();
   }, [enabled, qc]);

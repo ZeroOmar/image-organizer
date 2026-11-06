@@ -15,11 +15,12 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 | Route | Page |
 |---|---|
 | `/login` | `Login` |
-| `/` | `Home`: cards Import (pending count), Organize (green), GPS, Convert, Automation, Immich (TBA, disabled), Settings |
+| `/` | `Home`: cards Import (pending count), Organize (green), GPS, Convert, Duplicates, Automation, Immich (TBA, disabled), Settings |
 | `/import` | `Import`: Workspace on root `import` + Upload/drag-drop + Move to album |
 | `/organize?path=` | `Organize`: Workspace on root `media` + batch bar |
 | `/gps?root=&path=` | `Gps`: Workspace with a file list + map (root `media`, or `import` with `?root=import`) |
 | `/convert?root=&path=` | `Convert`: Workspace with a video table (codec, bitrate, size, candidate status) + Conversion pane (totals, progress with Cancel, savings); see [convert.md](convert.md) |
+| `/duplicates?root=&path=` | `Duplicates`: Workspace with duplicate groups (Keep checkboxes, Best pill) + Scan pane (mode, threshold, progress with Cancel, totals); see [duplicates.md](duplicates.md) |
 | `/automation` | rules list + editor + dry run |
 | `/trash` | restore / delete / empty |
 | `/settings` | dynamic settings + read-only static config |
@@ -70,6 +71,25 @@ Uses the same `Workspace`, with two of its panes swapped out: `sidePane` puts th
 
 Like the GPS page, it swaps two Workspace panes: `content` is a table of the folder's videos (thumbnail, length, resolution, codec, bitrate, size, Candidate/Already efficient/Low bitrate pill), filtered to **Candidates** by default, and `sidePane` is **Conversion** (candidate count and size, running conversions with % progress and **Cancel**, recent savings). Candidate rules come from `convertSkipReason()` in shared, the same function the planner uses. Rows click-select and right-click like grid tiles. **Select candidates** selects every candidate; **Convert to HEVC** opens `ConvertDialog` (quality CRF presets + slider, encoder preset), which Organize and Import use too.
 
+## Duplicates page (`src/pages/Duplicates.tsx`)
+
+Like Convert, it swaps two Workspace panes.
+
+The **Scan** side pane has:
+- Mode tabs: Exact / Near-identical / Similar scene. Similar scene is hidden when `similarAvailable` is false.
+- A loose → strict threshold slider.
+- **Scan**, which uses the Workspace folder and its Subfolders checkbox (`WorkspaceApi.recursive`).
+- Progress with **Cancel**, then the group count and how much would be trashed.
+
+Releasing the slider after a scan regroups the result (`GET /api/dupes/scan?threshold=`).
+
+The content pane has one `.dupe-group` card per group:
+- Kept tiles are green-tinted; the auto-picked one has a **Best** pill.
+- Clicking a thumbnail focuses the file in Preview/Metadata.
+- **Keep all** spares a group.
+
+The batch bar has **Auto-pick best** and **Move unkept to trash** (`TrashDialog`). After the job, `invalidateFiles()` refetches `dupes`, and trashed files drop out of the groups.
+
 ## Copy metadata dialog
 
 The source is picked from a comparison table: one row per selected file (thumbnail, name, radio), one column per tag that will be copied. Values come from `/api/metadata` (`useMetadataMany`). Click a row to make it the source; target cells that differ from the source are highlighted because the copy will change them. The table shows at most 50 files (one ExifTool read each).
@@ -84,4 +104,4 @@ Every action dialog wraps `components/ActionDialog.tsx`: form → **Preview chan
 
 ## Data hooks (`src/api/hooks.ts`)
 
-Query keys: `me, config, settings, tree, folder, metadata, jobs, trash, rules, importCount`. `useJobEvents` keeps `jobs` current and calls `invalidateFiles()` when a job finishes.
+Query keys: `me, config, settings, tree, folder, metadata, jobs, trash, rules, importCount, dupes`. `useJobEvents` keeps `jobs` current and calls `invalidateFiles()` when a job finishes. It also merges `scan` events into the `dupes` queries and refetches them when a scan ends.

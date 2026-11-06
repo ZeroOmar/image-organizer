@@ -1115,6 +1115,63 @@ table.table {
   font-size: 20px;
 }
 
+/* Duplicates page */
+.dupe-list {
+  height: 100%;
+  overflow: auto;
+  padding: var(--s-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-sm);
+}
+.dupe-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+  padding: var(--s-sm);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
+  border: 1px solid var(--hairline-translucent);
+}
+.dupe-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-xs);
+}
+.dupe-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--s-xs);
+}
+.dupe-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.dupe-tile.kept {
+  opacity: 1;
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.dupe-tile.focused {
+  border-color: var(--accent);
+}
+.dupe-best {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
 /* GPS page: map */
 .gps-map-area {
   position: relative;

@@ -5,3 +5,4 @@ export * from './template.js';
 export * from './issues.js';
 export * from './api.js';
 export * from './convert.js';
+export * from './dupes.js';

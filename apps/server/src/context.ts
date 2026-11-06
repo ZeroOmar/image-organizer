@@ -8,6 +8,7 @@ import type { SettingsStore } from './settings/store.js';
 import type { Thumbs } from './thumbs/thumbs.js';
 import type { Trash } from './trash/trash.js';
 import type { Automation } from './automation/automation.js';
+import type { DupeScanner } from './dupes/scanner.js';
 
 /** Everything route modules need. Built once in main.ts. */
 export interface AppContext {
@@ -22,4 +23,5 @@ export interface AppContext {
   trash: Trash;
   jobs: JobEngine;
   automation: Automation;
+  dupes: DupeScanner;
 }

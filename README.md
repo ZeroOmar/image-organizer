@@ -21,6 +21,7 @@ It automates a manual Adobe Bridge workflow: open a folder → check *Date Time 
 - **Issue highlighting** (optional): yellow outline for missing metadata, red for mismatched dates, plus a badge and tooltip listing the issues. Each check can be toggled.
 - **Filters**: issues, file type, media kind, month, date source, UTC offset, timezone source, GPS, camera make/model, orientation, ISO, aperture, exposure, focal length.
 - **Import**: a separate `/import` mount for incoming media, plus a browser **Upload** button and drag and drop. **Move to album** can also write dates and rename inside the album.
+- **Find duplicates**: a **Duplicates** page scans a folder for exact copies (photos and videos), near-identical copies (the same picture resized or recompressed, e.g. a WhatsApp copy of an original) and **similar scenes** (photos that look alike, taken at any time, matched by an on-device CLIP image model). It picks the best file of each group (largest, with capture date, timezone and GPS) and moves the rest to the trash, so Undo works.
 - **Convert videos**: shrink large phone videos by re-encoding them to **HEVC (H.265)** at the same resolution, typically 3–10× smaller. Dates, timezone, GPS, camera make/model and audio are kept. Videos that are already HEVC/AV1 or low bitrate are skipped, and the original goes to the trash, so Undo works. A dedicated **Convert** page lists codec, bitrate and size; it's also a batch action and an automation step. Encodes run on their own queue with live progress and Cancel.
 - **Automation**: saved rule pipelines that run on demand, on a **cron schedule**, or **when files arrive** in a watched folder, with a dry run.
 - **Safe by design**:
@@ -110,6 +111,9 @@ map:
   tileUrl: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
   attribution: "© OpenStreetMap contributors"
   nominatimUrl: "https://nominatim.openstreetmap.org"
+similar:                              # Duplicates → Similar scene
+  enabled: true
+  # modelPath: /app/models/clip.onnx  # local model instead of downloading it (offline)
 ```
 
 | Key | Required | Default | Description |
@@ -126,6 +130,8 @@ map:
 | `trash.retentionDays` | no | `30` | Auto-purge age (Settings can override) |
 | `timezone.default` | no | `UTC` | Zone for files with no offset and no GPS |
 | `map.*` | no | OSM | Tile server and place search |
+| `similar.enabled` | no | `true` | Duplicates → Similar scene (CLIP image model, ~90 MB, downloaded on first use) |
+| `similar.modelUrl` / `similar.modelPath` | no | Hugging Face / — | Where to download the model, or a local copy to use instead |
 
 ### Dynamic settings (UI)
 
@@ -154,7 +160,7 @@ The page also shows the static config read-only, with secrets masked.
 
 | Path | Purpose |
 |---|---|
-| `/app` | `config.yaml` (merged), `data/app.db` (sessions, settings, metadata cache, jobs/undo, trash index, rules), `cache/thumbs/` |
+| `/app` | `config.yaml` (merged), `data/app.db` (sessions, settings, metadata and duplicate-hash cache, jobs/undo, trash index, rules), `cache/thumbs/`, `cache/models/` |
 | `/media` | Your library. The Organize page works here. |
 | `/import` | Incoming media. Files can be dropped in by other tools or uploaded in the browser. |
 | `/trash` | Deleted files, kept as `/trash/<media\|import>/<original path>` for exact restore. Use a separate mount; moves across devices are copy → verify → unlink. |
@@ -184,7 +190,8 @@ The container serves **plain HTTP on port 80**; terminate TLS at your reverse pr
    - **GPS** sets a location; **Copy metadata** pulls dates, GPS or camera info from a good file.
    - Click any value in the Metadata panel to fix a single tag.
 3. **Rename**: select all, then **Rename** → preview → Apply.
-4. Anything wrong? Open the **Jobs menu** (header) and click **Undo**.
+4. **Duplicates**: scan an album for copies and look-alikes, check the picks, and move the rest to the trash.
+5. Anything wrong? Open the **Jobs menu** (header) and click **Undo**.
 
 ### Rename templates
 
@@ -247,7 +254,14 @@ All endpoints are under `/api` and require the session cookie from login. Every 
 | GET | `/api/jobs` · `/api/jobs/{id}` | Job status |
 | POST | `/api/jobs/{id}/undo` | Undo a job |
 | POST | `/api/jobs/{id}/cancel` | Cancel a queued or running job (e.g. a long video conversion) |
-| GET | `/api/events` | Server-sent job updates |
+| GET | `/api/events` | Server-sent job updates and duplicate-scan progress |
+
+### Duplicates
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/dupes/scan` | Scan a folder (`mode`: `exact`, `near`, `similar`) |
+| GET | `/api/dupes/scan?threshold=` | Latest scan with its groups (regroups at a new threshold) |
+| POST | `/api/dupes/cancel` | Cancel the running scan |
 
 ### Import, trash, settings, rules
 | Method | Path | Description |
@@ -317,6 +331,7 @@ image-organizer/
 │   │   │   ├── index/          # SQLite metadata cache, resolved dates, issues
 │   │   │   ├── jobs/           # Planner (dry run) + serial engine with undo
 │   │   │   ├── convert/        # ffmpeg HEVC encoder (video conversion)
+│   │   │   ├── dupes/          # Duplicate finder: SHA-256, dHash, CLIP (onnxruntime-web)
 │   │   │   ├── thumbs/         # sharp / ffmpeg / embedded-JPEG thumbnails
 │   │   │   ├── trash/          # /trash with restore + retention
 │   │   │   ├── automation/     # Rules: cron (croner) + folder watch (chokidar)
@@ -363,6 +378,8 @@ docker run --rm ghcr.io/zeroomar/image-organizer:latest node -e \
 
 **Convert is missing or says it's unavailable**: the server's ffmpeg has no libx265 encoder. The Docker image includes it; for a local run, install an ffmpeg built with x265 (`brew install ffmpeg`).
 
+**Similar scene says it couldn't download the model**: the first similar-scene scan downloads the CLIP model (~90 MB) from Hugging Face. Without internet access, download `vision_model_quantized.onnx` from `Xenova/clip-vit-base-patch32` yourself and set `similar.modelPath`, or turn the mode off with `similar.enabled: false`.
+
 **A tag edit fails with "Nothing was written"**: that tag is read-only for this file type (e.g. `Composite:*`, `File:*`).
 
 **Changes made outside the app don't show**: the metadata cache is keyed by file size + modified time. A change that keeps both (e.g. `exiftool -P`) is picked up after you restart the app or delete `/app/data/app.db`.
@@ -385,6 +402,7 @@ The tag also becomes the app version shown on the Home and Settings pages and in
 - Single admin account (no users/RBAC)
 - One job at a time (sequential queue by design, so batches never race on the same files). Video conversions encode on a second queue, but their file changes still go through the main one.
 - Video conversion is CPU-only (no GPU encoding); 1080p at the default preset runs at about real time or slower
+- Similar-scene grouping compares every pair of photos; scan folders of up to a few thousand photos at a time
 - Folder listings read metadata on first open, which takes a few seconds for very large folders (aimed at libraries under ~10k files)
 - No RAW formats yet (JPEG, PNG, WebP, HEIC, MP4, MOV)
 - Immich integration is planned (TBA)

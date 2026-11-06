@@ -43,6 +43,14 @@ export const ConfigSchema = z.object({
       nominatimUrl: z.string().default('https://nominatim.openstreetmap.org'),
     })
     .prefault({}),
+  /** "Similar scene" duplicates: CLIP image model, downloaded on first use unless modelPath is set. */
+  similar: z
+    .object({
+      enabled: z.boolean().default(true),
+      modelUrl: z.string().default('https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model_quantized.onnx'),
+      modelPath: z.string().optional(),
+    })
+    .prefault({}),
 });
 
 export type AppConfig = z.infer<typeof ConfigSchema>;

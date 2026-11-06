@@ -18,6 +18,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AppContext) {
     trashRetentionDays: ctx.settings.get().trash.retentionDays ?? ctx.config.trash.retentionDays,
     roots: ctx.roots.dirs,
     convertAvailable: await hasX265(),
+    similarAvailable: ctx.config.similar.enabled,
   }));
 
   /** Static config with secrets masked, for the read-only view in Settings. */

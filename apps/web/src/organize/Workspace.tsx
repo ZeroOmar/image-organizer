@@ -15,6 +15,8 @@ import { useSelectClick, type PickModifiers, type Selection } from './useSelectC
 export interface WorkspaceApi {
   root: RootName;
   folder: string;
+  /** The Subfolders checkbox: `entries` include files in subfolders. */
+  recursive: boolean;
   entries: EnrichedEntry[];
   visible: EnrichedEntry[];
   selected: EnrichedEntry[];
@@ -184,6 +186,7 @@ export function Workspace({
   const api: WorkspaceApi = {
     root,
     folder,
+    recursive,
     entries,
     visible,
     selected,

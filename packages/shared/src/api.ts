@@ -198,4 +198,6 @@ export interface PublicConfig {
   roots: Record<'media' | 'import' | 'trash', string>;
   /** False when ffmpeg has no libx265 encoder; the Convert feature is hidden. */
   convertAvailable: boolean;
+  /** False when `similar.enabled` is off; the Similar scene mode is hidden. */
+  similarAvailable: boolean;
 }

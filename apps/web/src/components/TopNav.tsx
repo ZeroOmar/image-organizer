@@ -10,6 +10,7 @@ const LINKS = [
   { to: '/organize', label: 'Organize' },
   { to: '/gps', label: 'GPS' },
   { to: '/convert', label: 'Convert' },
+  { to: '/duplicates', label: 'Duplicates' },
   { to: '/automation', label: 'Automation' },
   { to: '/trash', label: 'Trash' },
   { to: '/settings', label: 'Settings' },

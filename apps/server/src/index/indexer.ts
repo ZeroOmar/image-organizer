@@ -93,16 +93,21 @@ export class Indexer {
     return { ...e, resolved, issues: computeIssues({ entry: e, resolved, settings, folder }) };
   }
 
+  /** Also drops the duplicate-finder hashes (media_hash), which are validated the same way. */
   invalidate(ref: FileRef): void {
-    this.db.prepare('DELETE FROM media_cache WHERE root = ? AND rel = ?').run(ref.root, ref.rel);
+    for (const table of ['media_cache', 'media_hash']) {
+      this.db.prepare(`DELETE FROM ${table} WHERE root = ? AND rel = ?`).run(ref.root, ref.rel);
+    }
   }
 
   /** Drop cache rows for a folder subtree (after moving or trashing a folder). */
   invalidatePrefix(root: string, relPrefix: string): void {
-    this.db.prepare("DELETE FROM media_cache WHERE root = ? AND (rel = ? OR rel LIKE ? ESCAPE '\\')").run(
-      root,
-      relPrefix,
-      `${relPrefix.replace(/[\\%_]/g, '\\$&')}/%`,
-    );
+    for (const table of ['media_cache', 'media_hash']) {
+      this.db.prepare(`DELETE FROM ${table} WHERE root = ? AND (rel = ? OR rel LIKE ? ESCAPE '\\')`).run(
+        root,
+        relPrefix,
+        `${relPrefix.replace(/[\\%_]/g, '\\$&')}/%`,
+      );
+    }
   }
 }

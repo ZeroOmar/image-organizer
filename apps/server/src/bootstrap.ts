@@ -2,6 +2,9 @@ import { Automation } from './automation/automation.js';
 import type { AppConfig } from './config/schema.js';
 import type { AppContext } from './context.js';
 import { openDb } from './db/db.js';
+import { ClipModel } from './dupes/clip.js';
+import { HashStore } from './dupes/hashes.js';
+import { DupeScanner } from './dupes/scanner.js';
 import { Roots } from './fs/roots.js';
 import { Indexer } from './index/indexer.js';
 import { JobEngine } from './jobs/engine.js';
@@ -22,5 +25,6 @@ export function createContext(config: AppConfig, appDir: string): AppContext & {
   const trash = new Trash(db, roots);
   const jobs = new JobEngine(db, roots, indexer, metadata, trash, settings, config.timezone.default);
   const automation = new Automation(db, roots, jobs);
-  return { config, appDir, db, roots, settings, metadata, indexer, thumbs, trash, jobs, automation, devices };
+  const dupes = new DupeScanner(roots, indexer, thumbs, new HashStore(db), new ClipModel(config.similar, appDir));
+  return { config, appDir, db, roots, settings, metadata, indexer, thumbs, trash, jobs, automation, dupes, devices };
 }

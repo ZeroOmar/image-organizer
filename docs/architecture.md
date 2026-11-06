@@ -5,7 +5,7 @@
 | Path | What |
 |---|---|
 | `/opt/app` | Application code (`apps/server/dist`, `apps/web/dist`, `packages/shared/dist`, `node_modules`) |
-| `/app` | Volume: `config.yaml` (merged static config), `data/app.db` (SQLite), `cache/thumbs/` |
+| `/app` | Volume: `config.yaml` (merged static config), `data/app.db` (SQLite), `cache/thumbs/`, `cache/models/` (CLIP model, downloaded on first use) |
 | `/media` | Library root (`media`) |
 | `/import` | Incoming media root (`import`) |
 | `/trash` | Trash root (`trash`); usually a different device, so moves use copy → verify → unlink |
@@ -28,6 +28,7 @@
 | `Thumbs` | `thumbs/thumbs.ts` | JPEG thumbs/previews cached in `/app/cache/thumbs` (sharp → ffmpeg → embedded JPEG) |
 | `Trash` | `trash/trash.ts` | `/trash/<origin>/<rel>` + `trash_items` rows; restore/purge |
 | `JobEngine` | `jobs/engine.ts` | Plans and executes jobs serially; undo; emits `job` events for SSE |
+| `DupeScanner` | `dupes/scanner.ts` | Read-only duplicate/similar scans (SHA-256, dHash, CLIP via `dupes/clip.ts`), hashes cached in `media_hash`; emits `scan` events for SSE ([duplicates.md](duplicates.md)) |
 | `Automation` | `automation/automation.ts` | Rules CRUD, croner schedules, chokidar watchers |
 | `SettingsStore` | `settings/store.ts` | Dynamic settings JSON row |
 
@@ -52,6 +53,7 @@ Op kinds: `writeTags` (with snapshot), `copyTags`, `rename`, `move`, `utimes`, `
 - `sessions(id, username, created_at, expires_at)`
 - `settings(key, value JSON)`: one row `app` = `SettingsSchema`
 - `media_cache(root, rel, size, mtime_ms, meta JSON, error)`
+- `media_hash(root, rel, size, mtime_ms, sha256, dhash, clip BLOB)`: duplicate-finder hashes, each filled on demand; dropped with `media_cache` on invalidate
 - `jobs(id, title, status, request JSON, total, done, errors JSON, undo JSON, rule_id, lane, notes JSON, saved_bytes, created_at, finished_at)`
 - `convert_tmp(path)`: temp encode files, deleted at startup
 - `trash_items(id, origin_root, original_rel, trash_rel, size, deleted_at)`

@@ -12,6 +12,7 @@ import { APP_VERSION } from '../version.js';
 import { HttpError } from './errors.js';
 import { adminRoutes } from './routes/admin.js';
 import { browseRoutes } from './routes/browse.js';
+import { dupeRoutes } from './routes/dupes.js';
 import { importRoutes } from './routes/import.js';
 import { jobRoutes } from './routes/jobs.js';
 
@@ -39,6 +40,7 @@ export async function buildApp(ctx: AppContext, opts: { webDist?: string; logger
   jobRoutes(app, ctx);
   importRoutes(app, ctx);
   adminRoutes(app, ctx);
+  dupeRoutes(app, ctx);
 
   const webDist = opts.webDist;
   if (webDist && fs.existsSync(path.join(webDist, 'index.html'))) {

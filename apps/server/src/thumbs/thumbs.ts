@@ -11,7 +11,7 @@ import type { Metadata } from '../metadata/exiftool.js';
 const run = promisify(execFile);
 
 /** Small semaphore so a big folder doesn't start hundreds of sharp/ffmpeg jobs at once. */
-class Limit {
+export class Limit {
   private active = 0;
   private queue: (() => void)[] = [];
   constructor(private max: number) {}

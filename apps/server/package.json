@@ -1,7 +1,7 @@
 {
   "name": "@io/server",
   "private": true,
-  "version": "0.5.1",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "dev": "tsx watch --conditions=development --clear-screen=false src/main.ts",
@@ -22,6 +22,7 @@
     "exiftool-vendored": "^39.1.0",
     "fastify": "^5.12.7",
     "geo-tz": "^8.1.10",
+    "onnxruntime-web": "^1.31.1",
     "sharp": "^0.35.5",
     "yaml": "^2.6.1",
     "zod": "^4.6.6"

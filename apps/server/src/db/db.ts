@@ -64,6 +64,19 @@ const MIGRATIONS: string[] = [
   ALTER TABLE jobs ADD COLUMN saved_bytes INTEGER NOT NULL DEFAULT 0;
   CREATE TABLE convert_tmp (path TEXT PRIMARY KEY);
   `,
+  // Duplicate finder: content hash, perceptual hash and CLIP embedding per file, each filled on demand.
+  `
+  CREATE TABLE media_hash (
+    root TEXT NOT NULL,
+    rel TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    mtime_ms REAL NOT NULL,
+    sha256 TEXT,
+    dhash TEXT,
+    clip BLOB,
+    PRIMARY KEY (root, rel)
+  );
+  `,
 ];
 
 export function openDb(appDir: string): DB {
