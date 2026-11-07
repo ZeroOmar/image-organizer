@@ -190,7 +190,7 @@ function JobRow({ job, onDismiss }: { job: JobInfo; onDismiss: () => void }) {
               Undo
             </button>
           )}
-          {active && job.lane === 'convert' && (
+          {(job.status === 'queued' || (job.status === 'running' && job.lane === 'convert')) && (
             <button
               className="btn btn-sm btn-danger"
               disabled={busy}

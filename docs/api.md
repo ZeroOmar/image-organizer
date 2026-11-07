@@ -47,7 +47,7 @@ A root itself can only be chmod/chown'ed, and folders in the trash are refused. 
 | `GET /jobs/:id` | `JobInfo` |
 | `POST /jobs/:id/undo` | `JobInfo` of the undo job (`done` or `cancelled` jobs with undo entries) |
 | `POST /jobs/:id/cancel` | `JobInfo`; stops a queued or running job (kills a running ffmpeg encode); 409 otherwise |
-| `GET /events` | SSE, `event: job` with `JobInfo` on every update, and `event: scan` with `DupeScan` (no `groups`) for duplicate-scan progress |
+| `GET /events` | SSE, `event: job` with `JobInfo` when a job is queued and on every update, and `event: scan` with `DupeScan` (no `groups`) for duplicate-scan progress |
 
 `JobRequest = { title?, selection: {files: FileRef[]} | {folder: FileRef, recursive?}, steps: Step[] }`.
 

@@ -159,7 +159,10 @@ export class JobEngine extends EventEmitter {
       .run(id, title, 'queued', JSON.stringify(req), plan.ops.length, ruleId, lane, Date.now());
     const planErrors = plan.items.filter((i) => i.error).map((i) => ({ file: refText(i.file), message: i.error! }));
     this.enqueue(() => this.execute(id, plan.ops, planErrors, lane), lane);
-    return this.get(id);
+    // Announce it now: behind another job on its lane, it would otherwise stay invisible until it starts.
+    const job = this.get(id);
+    this.emit('job', job);
+    return job;
   }
 
   /** Run arbitrary work in the job queue (trash restore/purge). */

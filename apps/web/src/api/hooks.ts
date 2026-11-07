@@ -132,11 +132,14 @@ export function useJobEvents(enabled: boolean) {
     const es = new EventSource('/api/events');
     es.addEventListener('job', (ev) => {
       const job = JSON.parse((ev as MessageEvent).data) as JobInfo;
+      const prev = qc.getQueryData<JobInfo[]>(keys.jobs)?.find((j) => j.id === job.id);
       qc.setQueryData<JobInfo[]>(keys.jobs, (list = []) => {
         const rest = list.filter((j) => j.id !== job.id);
         return [job, ...rest].sort((a, b) => b.createdAt - a.createdAt);
       });
       if (job.status === 'done' || job.status === 'failed' || job.status === 'cancelled') invalidateFiles(qc);
+      // Each converted video is swapped in as soon as it's encoded (minutes apart): show it without waiting for the job.
+      else if (job.lane === 'convert' && prev && job.done > prev.done) invalidateFiles(qc);
     });
     es.addEventListener('scan', (ev) => {
       const scan = JSON.parse((ev as MessageEvent).data) as DupeScan;

@@ -76,4 +76,4 @@ To change the schema, **append** a new migration string; never edit an old one.
 
 ## Web
 
-React Query for data, SSE (`/api/events`) for job progress; finishing a job invalidates the `folder`/`tree`/`metadata`/`trash` queries. See [ui.md](ui.md).
+React Query for data, SSE (`/api/events`) for job progress; finishing a job invalidates the `folder`/`tree`/`metadata`/`trash` queries (a convert job also does so after each file). See [ui.md](ui.md).
