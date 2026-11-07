@@ -1,11 +1,12 @@
-import type { EnrichedEntry, FileRef, RootName } from '@io/shared';
-import { useMemo, useState, type ReactNode } from 'react';
+import type { EnrichedEntry, FileRef, FolderOp, RootName } from '@io/shared';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
 import { useSearchParams } from 'react-router-dom';
-import { runJobAndWait, useFolder, useSettings } from '../api/hooks';
+import { runJobAndWait, useFolder, useSettings, waitForJob } from '../api/hooks';
 import { ContextMenu, type MenuItem } from '../components/ContextMenu';
 import { FolderTree } from '../components/FolderTree';
 import { ContentGrid } from './ContentGrid';
+import { FolderDialog, type FolderDialogKind } from './dialogs/FolderDialogs';
 import { FilterPanel } from './FilterPanel';
 import { applyFilters, sortEntries, type FilterState, type SortKey } from './filters';
 import { MetadataPanel, type MetadataEditing } from './MetadataPanel';
@@ -137,6 +138,9 @@ export function Workspace({
   const [leftTab] = useState<'folders'>('folders');
   const [metaTab, setMetaTab] = useState<'summary' | 'all'>('summary');
   const [menu, setMenu] = useState<MenuRequest | null>(null);
+  const [folderMenu, setFolderMenu] = useState<{ x: number; y: number; rel: string; shift?: boolean } | null>(null);
+  const [folderDialog, setFolderDialog] = useState<{ kind: FolderDialogKind; rel: string; permanent?: boolean } | null>(null);
+  const shift = useShiftKey(!!folderMenu, !!folderMenu?.shift);
 
   const settings = useSettings().data;
   const listing = useFolder(root, folder, recursive);
@@ -161,6 +165,32 @@ export function Workspace({
     });
     setSelection(new Set());
     setFocusedRel(null);
+  };
+
+  // After a folder op, keep showing the same files: follow a renamed/moved folder, leave a deleted one.
+  const followFolder = (src: string, op: FolderOp) => {
+    if (folder !== src && !folder.startsWith(`${src}/`)) return;
+    const rest = folder.slice(src.length);
+    const parent = src.includes('/') ? src.slice(0, src.lastIndexOf('/')) : '';
+    const name = src.slice(src.lastIndexOf('/') + 1);
+    if (op.type === 'rename') go(`${parent ? `${parent}/` : ''}${op.name}${rest}`);
+    else if (op.type === 'move' && op.dest.root === root) go(`${op.dest.rel ? `${op.dest.rel}/` : ''}${name}${rest}`);
+    else if (op.type === 'move' || op.type === 'trash' || op.type === 'delete') go(parent);
+  };
+
+  const folderMenuItems = (rel: string): MenuItem[] => {
+    const open = (kind: FolderDialogKind, permanent?: boolean) => () => setFolderDialog({ kind, rel, permanent });
+    const isRoot = rel === '';
+    return [
+      { label: 'Rename…', onSelect: open('rename'), disabled: isRoot },
+      { label: 'Move to…', onSelect: open('move'), disabled: isRoot },
+      { label: 'Copy to…', onSelect: open('copy'), disabled: isRoot },
+      { label: 'Permissions (chmod)…', onSelect: open('chmod'), separator: true },
+      { label: 'Owner (chown)…', onSelect: open('chown') },
+      shift
+        ? { label: 'Delete permanently…', onSelect: open('trash', true), disabled: isRoot, danger: true, separator: true }
+        : { label: 'Move to trash…', onSelect: open('trash'), disabled: isRoot, danger: true, separator: true },
+    ];
   };
 
   // Right-click / long-press (grid tiles and custom panes): a file outside the selection replaces it (mouse, like Finder)
@@ -255,7 +285,7 @@ export function Workspace({
                   </div>
                 </div>
                 <div className="pane-body">
-                  <FolderTree root={root} selected={folder} onSelect={go} rootLabel={rootLabel} />
+                  <FolderTree root={root} selected={folder} onSelect={go} rootLabel={rootLabel} onMenu={root === 'trash' ? undefined : (x, y, rel, shift) => setFolderMenu({ x, y, rel, shift })} />
                 </div>
               </div>
             </Panel>
@@ -320,6 +350,27 @@ export function Workspace({
                 onDropFiles={onDropFiles ? (files) => onDropFiles(folder, files) : undefined}
                 onMenu={actions ? openMenu : undefined}
                 empty={listing.isLoading ? 'Reading metadata…' : entries.length ? 'No files match the filters.' : emptyText}
+              />
+            )}
+            {folderMenu && (
+              <ContextMenu
+                x={folderMenu.x}
+                y={folderMenu.y}
+                title={folderMenu.rel ? folderMenu.rel.split('/').pop() : rootLabel}
+                items={folderMenuItems(folderMenu.rel)}
+                onClose={() => setFolderMenu(null)}
+              />
+            )}
+            {folderDialog && (
+              <FolderDialog
+                kind={folderDialog.kind}
+                folder={{ root, rel: folderDialog.rel }}
+                permanent={folderDialog.permanent}
+                onClose={() => setFolderDialog(null)}
+                onApplied={(op, jobId) => {
+                  const src = folderDialog.rel;
+                  void waitForJob(jobId).then((j) => j.status === 'done' && followFolder(src, op));
+                }}
               />
             )}
             {menu && (
@@ -394,4 +445,21 @@ export function Workspace({
       </Group>
     </div>
   );
+}
+
+/** Whether Shift is held (while `active`): the folder menu offers "Delete permanently" instead of trash. */
+function useShiftKey(active: boolean, initial: boolean): boolean {
+  const [down, setDown] = useState(initial);
+  useEffect(() => {
+    setDown(active && initial);
+    if (!active) return;
+    const on = (e: KeyboardEvent) => setDown(e.shiftKey);
+    window.addEventListener('keydown', on);
+    window.addEventListener('keyup', on);
+    return () => {
+      window.removeEventListener('keydown', on);
+      window.removeEventListener('keyup', on);
+    };
+  }, [active, initial]);
+  return down;
 }

@@ -1,6 +1,10 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 
+/** Touch: hold this long (without moving further than SLOP px) to open a context menu. */
+export const LONG_PRESS_MS = 500;
+export const LONG_PRESS_SLOP = 10;
+
 export interface MenuItem {
   label: string;
   onSelect: () => void;

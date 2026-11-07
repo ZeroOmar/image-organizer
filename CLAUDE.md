@@ -47,8 +47,8 @@ The server dev loop resolves `@io/shared` to TS source via the `development` exp
 
 ## Hard rules
 
-1. **Paths**: always `roots.resolve({root, rel})`. Never join user paths yourself. Moves between roots happen only through import → media (the `move` step) and trash/restore.
-2. **Mutations**: everything that changes files is a **step** run by the **job engine**: plan (dry run) → submit → serial execution → undo entries. Don't write files from route handlers. Trash restore/purge use `jobs.exclusive()`. Jobs with a `convert` step run on a second lane (long encodes only read the original); every file change they make still runs on the main lane through `exclusive()`.
+1. **Paths**: always `roots.resolve({root, rel})`. Never join user paths yourself. Moves between roots happen only through the `move` step, folder move/copy (Folders pane menu, media ↔ import) and trash/restore.
+2. **Mutations**: everything that changes files is a **step** run by the **job engine**: plan (dry run) → submit → serial execution → undo entries. Don't write files from route handlers. Folder operations (rename/move/copy/trash/delete/chmod/chown, `jobs/folders.ts`) are jobs too (`jobs.submitFolder()`). Trash restore/purge use `jobs.exclusive()`. Jobs with a `convert` step run on a second lane (long encodes only read the original); every file change they make still runs on the main lane through `exclusive()`.
 3. **Undo**: every op records an inverse (tag snapshot, reverse move, previous mtime, trash id). New ops must too.
 4. **ExifTool**: only through `metadata/exiftool.ts`. Writes use `-overwrite_original -P` (keep mtime) and call `indexer.invalidate()` afterwards; the job engine already does this.
 5. **GPS writes**: photos use signed decimals **without** `-n` (exiftool-vendored adds a GPSPosition that `-n` breaks). Videos (`Keys:GPSCoordinates`) need `-n`. See `metadata/tags.ts`.

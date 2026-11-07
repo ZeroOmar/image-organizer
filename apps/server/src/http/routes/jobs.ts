@@ -1,4 +1,4 @@
-import { JobRequestSchema, type DupeScan, type JobInfo } from '@io/shared';
+import { FolderJobRequestSchema, JobRequestSchema, type DupeScan, type JobInfo } from '@io/shared';
 import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../../context.js';
 import { JobEngine } from '../../jobs/engine.js';
@@ -9,6 +9,11 @@ export function jobRoutes(app: FastifyInstance, ctx: AppContext) {
   app.post('/api/jobs/plan', async (req) => JobEngine.toResult(await ctx.jobs.plan(parse(JobRequestSchema, req.body))));
 
   app.post('/api/jobs', async (req) => ctx.jobs.submit(parse(JobRequestSchema, req.body)));
+
+  /** Folder operations (Folders pane menu): rename, move, copy, trash, delete, chmod, chown. Same dry run → job flow. */
+  app.post('/api/folders/plan', async (req) => JobEngine.toResult(await ctx.jobs.planFolder(parse(FolderJobRequestSchema, req.body))));
+
+  app.post('/api/folders/apply', async (req) => ctx.jobs.submitFolder(parse(FolderJobRequestSchema, req.body)));
 
   app.get('/api/jobs', async () => ctx.jobs.list());
 

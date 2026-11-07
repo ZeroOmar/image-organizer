@@ -283,6 +283,11 @@ input[type='range'] {
 .chip:hover {
   border-color: var(--accent);
 }
+.chip.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+}
 .error-text {
   color: #ff8a80;
 }

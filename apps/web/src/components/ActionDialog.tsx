@@ -1,17 +1,25 @@
-import { STEP_INFO, type PlanResult, type Selection, type Step } from '@io/shared';
+import { STEP_INFO, type JobInfo, type PlanResult, type Selection, type Step } from '@io/shared';
 import { useState, type ReactNode } from 'react';
 import { planJob, submitJob } from '../api/hooks';
 import { Dialog } from './Dialog';
 
+/** A job that isn't steps on a selection (e.g. a folder operation): how to dry-run and submit it. */
+export interface JobRunner {
+  plan: () => Promise<PlanResult>;
+  submit: () => Promise<JobInfo>;
+}
+
 /**
  * Every batch action uses this two-stage dialog: a form that builds `steps`, then a dry-run
  * table from /api/jobs/plan, then Apply (queues a job; progress shows in the header Jobs menu).
+ * Folder operations pass `runner` instead of `selection` + `steps`.
  */
 export function ActionDialog({
   title,
   eyebrow,
   selection,
   steps,
+  runner,
   invalid,
   onClose,
   onApplied,
@@ -21,9 +29,11 @@ export function ActionDialog({
 }: {
   title: string;
   eyebrow?: string;
-  selection: Selection;
+  selection?: Selection;
   /** null while the form is incomplete. */
-  steps: Step[] | null;
+  steps?: Step[] | null;
+  /** Instead of selection + steps; null while the form is incomplete. */
+  runner?: JobRunner | null;
   invalid?: string | null;
   onClose: () => void;
   onApplied?: (jobId: string) => void;
@@ -35,12 +45,13 @@ export function ActionDialog({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const ready = runner !== undefined ? !!runner : !!steps && !!selection;
   const preview = async () => {
-    if (!steps) return;
+    if (!ready) return;
     setBusy(true);
     setError(null);
     try {
-      setPlan(await planJob({ selection, steps }));
+      setPlan(runner ? await runner.plan() : await planJob({ selection: selection!, steps: steps! }));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -48,10 +59,10 @@ export function ActionDialog({
     }
   };
   const apply = async () => {
-    if (!steps) return;
+    if (!ready) return;
     setBusy(true);
     try {
-      const job = await submitJob({ selection, steps, title });
+      const job = runner ? await runner.submit() : await submitJob({ selection: selection!, steps: steps!, title });
       onApplied?.(job.id);
       onClose();
     } catch (e) {
@@ -79,7 +90,7 @@ export function ActionDialog({
       <button className="btn" onClick={onClose}>
         Cancel
       </button>
-      <button className="btn btn-primary" onClick={preview} disabled={busy || !steps || !!invalid}>
+      <button className="btn btn-primary" onClick={preview} disabled={busy || !ready || !!invalid}>
         {busy ? 'Checking…' : 'Preview changes'}
       </button>
     </>

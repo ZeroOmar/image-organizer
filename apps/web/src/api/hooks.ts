@@ -1,6 +1,7 @@
 import type {
   DupeScan,
   DupeScanRequest,
+  FolderJobRequest,
   FolderListing,
   JobInfo,
   JobRequest,
@@ -96,18 +97,26 @@ export const cancelDupeScan = () => api<DupeScan | null>('/api/dupes/cancel', { 
 
 export const planJob = (req: JobRequest) => api<PlanResult>('/api/jobs/plan', { method: 'POST', body: req });
 export const submitJob = (req: JobRequest) => api<JobInfo>('/api/jobs', { method: 'POST', body: req });
+/** Folder operations (Folders pane menu): same dry run → job flow as batch actions. */
+export const planFolderJob = (req: FolderJobRequest) => api<PlanResult>('/api/folders/plan', { method: 'POST', body: req });
+export const applyFolderJob = (req: FolderJobRequest) => api<JobInfo>('/api/folders/apply', { method: 'POST', body: req });
 export const undoJob = (id: string) => api<JobInfo>(`/api/jobs/${id}/undo`, { method: 'POST' });
 export const cancelJob = (id: string) => api<JobInfo>(`/api/jobs/${id}/cancel`, { method: 'POST' });
 
 /** Submit a job and wait until it finishes; throws the first per-file error (for inline edits). */
 export async function runJobAndWait(req: JobRequest): Promise<JobInfo> {
-  let job = await submitJob(req);
-  while (job.status === 'queued' || job.status === 'running') {
-    await new Promise((r) => setTimeout(r, 250));
-    job = await api<JobInfo>(`/api/jobs/${job.id}`);
-  }
+  const job = await waitForJob((await submitJob(req)).id);
   if (job.errors.length) throw new Error(job.errors[0].message);
   return job;
+}
+
+/** Poll a queued or running job until it finishes. */
+export async function waitForJob(id: string): Promise<JobInfo> {
+  for (;;) {
+    const job = await api<JobInfo>(`/api/jobs/${id}`);
+    if (job.status !== 'queued' && job.status !== 'running') return job;
+    await new Promise((r) => setTimeout(r, 250));
+  }
 }
 
 /** After any job finishes, files may have moved/changed everywhere: refresh what depends on them. */

@@ -42,6 +42,12 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 - Touch (tablets): a tap toggles a tile in the selection (like Cmd-click), and a tap on empty space doesn't clear it. A long-press opens the context menu.
 - Context menu (`components/ContextMenu.tsx`): right-click or long-press a tile. It lists the page's batch actions, then Select all, Select range to here and Clear selection. A tile outside the selection replaces it (mouse) or joins it (touch). Pages pass `actions(api)` (a `BatchAction[]`) to `Workspace` and render the BatchBar buttons from the same list with `actionButtons()`, so the bar and the menu stay in sync.
 - Preview (`PreviewPane.tsx`): the focused file, or with several selected a fanned stack of up to 5 thumbnails (focused on top, green border) and the count. Cmd/Ctrl-click (or a tap) that deselects a file moves focus to the last remaining selected file, so Preview and Metadata never show a file that left the selection.
+- Folder menu: right-click or long-press a folder in the Folders pane (every Workspace page, not the trash).
+  - Items: **Rename**, **Move to…**, **Copy to…** (destination in Media or Import), **Permissions (chmod)**, **Owner (chown)** and **Move to trash**.
+  - Holding Shift turns the last item into **Delete permanently**; the trash dialog also has a checkbox for it.
+  - The root folder only offers chmod/chown.
+  - Dialogs are in `organize/dialogs/FolderDialogs.tsx` and use `ActionDialog` with a `runner` (`/api/folders/plan` → `/api/folders/apply`).
+  - When the job finishes, the Workspace follows a renamed or moved folder, or goes to the parent of a trashed one, if you were inside it.
 - Filters (`filters.ts`) are computed client-side from the listing: OR within a facet, AND across facets.
 - The page passes `batchBar(api)` (and optionally `toolbar(api)`) render props, an optional `statusTools` node that replaces the thumbnail Size slider, plus an optional `folderTools` node shown in the Folders pane header next to the **Subfolders** checkbox; `WorkspaceApi` gives `selected`, `selection` (FileRefs), `focused`, `entries`, `folder`.
 

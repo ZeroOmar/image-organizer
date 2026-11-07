@@ -21,6 +21,7 @@ It automates a manual Adobe Bridge workflow: open a folder → check *Date Time 
 - **Issue highlighting** (optional): yellow outline for missing metadata, red for mismatched dates, plus a badge and tooltip listing the issues. Each check can be toggled.
 - **Filters**: issues, file type, media kind, month, date source, UTC offset, timezone source, GPS, camera make/model, orientation, ISO, aperture, exposure, focal length.
 - **Import**: a separate `/import` mount for incoming media, plus a browser **Upload** button and drag and drop. **Move to album** can also write dates and rename inside the album.
+- **Manage folders**: right-click (or long-press) a folder to rename, move or copy it (also between Media and Import), move it to the trash (Shift: delete permanently), or change its permissions (chmod) and owner (chown), recursively. Every change has a dry run and, except permanent delete, Undo.
 - **Find duplicates**: a **Duplicates** page scans a folder for exact copies (photos and videos), near-identical copies (the same picture resized or recompressed, e.g. a WhatsApp copy of an original) and **similar scenes** (photos that look alike, taken at any time, matched by an on-device CLIP image model). It picks the best file of each group (largest, with capture date, timezone and GPS) and moves the rest to the trash, so Undo works.
 - **Convert videos**: shrink large phone videos by re-encoding them to **HEVC (H.265)** at the same resolution, typically 3–10× smaller. Dates, timezone, GPS, camera make/model and audio are kept. Videos that are already HEVC/AV1 or low bitrate are skipped, and the original goes to the trash, so Undo works. A dedicated **Convert** page lists codec, bitrate and size; it's also a batch action and an automation step. Encodes run on their own queue with live progress and Cancel.
 - **Automation**: saved rule pipelines that run on demand, on a **cron schedule**, or **when files arrive** in a watched folder, with a dry run.
@@ -263,6 +264,12 @@ All endpoints are under `/api` and require the session cookie from login. Every 
 | GET | `/api/dupes/scan?threshold=` | Latest scan with its groups (regroups at a new threshold) |
 | POST | `/api/dupes/cancel` | Cancel the running scan |
 
+### Folders
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/folders/plan` | Dry run of a folder operation (rename, move, copy, trash, delete, chmod, chown) |
+| POST | `/api/folders/apply` | Run it as a job |
+
 ### Import, trash, settings, rules
 | Method | Path | Description |
 |---|---|---|
@@ -379,6 +386,8 @@ docker run --rm ghcr.io/zeroomar/image-organizer:latest node -e \
 **Convert is missing or says it's unavailable**: the server's ffmpeg has no libx265 encoder. The Docker image includes it; for a local run, install an ffmpeg built with x265 (`brew install ffmpeg`).
 
 **Similar scene says it couldn't download the model**: the first similar-scene scan downloads the CLIP model (~90 MB) from Hugging Face. Without internet access, download `vision_model_quantized.onnx` from `Xenova/clip-vit-base-patch32` yourself and set `similar.modelPath`, or turn the mode off with `similar.enabled: false`.
+
+**chown/chmod rows show “can't be changed by the app's user”**: the app runs as `PUID`, and Linux only lets a file's owner change its permissions, and only root change its owner. Set `PUID`/`PGID` to the owner of the share, or run the container with `PUID=0` to change owners.
 
 **A tag edit fails with "Nothing was written"**: that tag is read-only for this file type (e.g. `Composite:*`, `File:*`).
 

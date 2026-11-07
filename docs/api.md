@@ -23,6 +23,21 @@ All routes are under `/api`. Auth: signed `io_session` cookie. Every non-GET req
 | `GET /thumb?root&rel&size=64..2048` | JPEG (cached) |
 | `GET /file?root&rel[&download=1]` | original bytes with Range support; HEIC/HEIF → JPEG preview unless `download=1` |
 
+## Folders
+| | |
+|---|---|
+| `POST /folders/plan` `FolderJobRequest` | `PlanResult` (dry run) |
+| `POST /folders/apply` `FolderJobRequest` | `JobInfo` (queued); undo like any job, except `delete` |
+
+`FolderJobRequest = { folder: FileRef, op }`, with `op` one of:
+- `{type:'rename', name}`
+- `{type:'move'|'copy', dest: FileRef}`: `dest` is the new parent, in media or import.
+- `{type:'trash'}` or `{type:'delete'}`: `delete` is permanent and not undoable.
+- `{type:'chmod', dirMode?, fileMode?, recursive}`: modes are octal strings such as `"755"`.
+- `{type:'chown', uid?, gid?, recursive}`
+
+A root itself can only be chmod/chown'ed, and folders in the trash are refused. A chmod or chown the app's user isn't allowed to make (not root, not the owner, a group it isn't in) appears as an error row in the dry run and is skipped.
+
 ## Jobs
 | | |
 |---|---|

@@ -2,7 +2,7 @@ import type { FileRef, TrashItem } from '@io/shared';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { DB } from '../db/db.js';
-import { moveFile, uniqueName } from '../fs/ops.js';
+import { moveFile, treeStats, uniqueName } from '../fs/ops.js';
 import { dirOfRel, joinRel, nameOfRel, type Roots } from '../fs/roots.js';
 import { HttpError } from '../http/errors.js';
 
@@ -26,7 +26,7 @@ const toItem = (r: Row): TrashItem => ({
 
 /**
  * Trash lives on its own mount (/trash). Files keep their origin and relative path:
- * /trash/media/<rel>, /trash/import/<rel>. A row per item makes restore exact.
+ * /trash/media/<rel>, /trash/import/<rel>. A row per item (a file or a whole folder) makes restore exact.
  */
 export class Trash {
   constructor(
@@ -38,6 +38,7 @@ export class Trash {
     if (ref.root === 'trash') throw new HttpError(400, 'Already in trash');
     const src = this.roots.resolve(ref);
     const st = await fs.stat(src.abs);
+    const size = st.isDirectory() ? (await treeStats(src.abs)).bytes : st.size;
     const wantDir = joinRel(ref.root, dirOfRel(src.rel));
     const dstDir = this.roots.resolve({ root: 'trash', rel: wantDir });
     await fs.mkdir(dstDir.abs, { recursive: true });
@@ -46,8 +47,8 @@ export class Trash {
     await moveFile(src.abs, path.join(dstDir.abs, name));
     const info = this.db
       .prepare('INSERT INTO trash_items (origin_root, original_rel, trash_rel, size, deleted_at) VALUES (?, ?, ?, ?, ?)')
-      .run(ref.root, src.rel, trashRel, st.size, Date.now());
-    return { id: Number(info.lastInsertRowid), originRoot: ref.root, originalRel: src.rel, trashRel, size: st.size, deletedAt: Date.now() };
+      .run(ref.root, src.rel, trashRel, size, Date.now());
+    return { id: Number(info.lastInsertRowid), originRoot: ref.root, originalRel: src.rel, trashRel, size, deletedAt: Date.now() };
   }
 
   /** Restore to the original path; if that name is taken now, use name_1.ext etc. Returns the restored ref. */
@@ -64,7 +65,7 @@ export class Trash {
 
   async purge(id: number): Promise<void> {
     const row = this.get(id);
-    await fs.rm(this.roots.resolve({ root: 'trash', rel: row.trash_rel }).abs, { force: true });
+    await fs.rm(this.roots.resolve({ root: 'trash', rel: row.trash_rel }).abs, { recursive: true, force: true });
     this.db.prepare('DELETE FROM trash_items WHERE id = ?').run(id);
   }
 

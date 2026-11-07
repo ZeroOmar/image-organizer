@@ -6,3 +6,4 @@ export * from './issues.js';
 export * from './api.js';
 export * from './convert.js';
 export * from './dupes.js';
+export * from './folders.js';

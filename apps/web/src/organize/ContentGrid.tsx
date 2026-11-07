@@ -1,10 +1,9 @@
 import { formatDisplay, type EnrichedEntry } from '@io/shared';
 import { memo, useCallback, useEffect, useRef, type DragEvent, type MouseEvent, type PointerEvent } from 'react';
 import { thumbUrl } from '../api/client';
+import { LONG_PRESS_MS, LONG_PRESS_SLOP } from '../components/ContextMenu';
 import type { PickModifiers, Selection } from './useSelectClick';
 
-const LONG_PRESS_MS = 500;
-const LONG_PRESS_SLOP = 10;
 
 /** Outline + badge class from the file's issues: mismatch (red) beats missing (yellow); name-only gets a badge. */
 function issueClass(e: EnrichedEntry, highlight: boolean) {

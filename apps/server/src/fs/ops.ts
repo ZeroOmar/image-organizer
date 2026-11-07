@@ -14,8 +14,8 @@ const exists = (p: string) =>
 export const isHidden = (name: string) => name.startsWith('.');
 
 /**
- * Move a file without ever overwriting. Same device → rename(). Across devices (e.g. /media → /trash)
- * → copy to a temp name, verify size, fsync, rename into place, then unlink the source.
+ * Move a file or folder without ever overwriting. Same device → rename(). Across devices (e.g.
+ * /media → /trash) → copy to a temp name, verify size, fsync, rename into place, then remove the source.
  */
 export async function moveFile(src: string, dst: string): Promise<void> {
   if (src === dst) return;
@@ -30,6 +30,11 @@ export async function moveFile(src: string, dst: string): Promise<void> {
     return;
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e;
+  }
+  if ((await fs.lstat(src)).isDirectory()) {
+    await copyTree(src, dst);
+    await fs.rm(src, { recursive: true });
+    return;
   }
   const tmp = path.join(path.dirname(dst), `.io-tmp-${randomUUID()}`);
   try {
@@ -46,6 +51,58 @@ export async function moveFile(src: string, dst: string): Promise<void> {
     throw e;
   }
   await fs.unlink(src);
+}
+
+/** Totals of a folder tree: files and subfolders (hidden ones included), bytes. Symlinks are skipped. */
+export interface TreeStats {
+  files: number;
+  dirs: number;
+  bytes: number;
+}
+
+/**
+ * Every entry under `abs` (hidden ones too, not following symlinks), as paths relative to it,
+ * folders before their contents.
+ */
+export async function walkAll(abs: string): Promise<{ rel: string; dir: boolean; size: number; mode: number; uid: number; gid: number }[]> {
+  const out: Awaited<ReturnType<typeof walkAll>> = [];
+  const visit = async (dir: string, rel: string) => {
+    for (const d of await fs.readdir(dir, { withFileTypes: true })) {
+      if (d.isSymbolicLink() || (!d.isDirectory() && !d.isFile())) continue;
+      const p = path.join(dir, d.name);
+      const r = rel ? `${rel}/${d.name}` : d.name;
+      const st = await fs.lstat(p);
+      out.push({ rel: r, dir: d.isDirectory(), size: d.isFile() ? st.size : 0, mode: st.mode & 0o7777, uid: st.uid, gid: st.gid });
+      if (d.isDirectory()) await visit(p, r);
+    }
+  };
+  await visit(abs, '');
+  return out;
+}
+
+export async function treeStats(abs: string): Promise<TreeStats> {
+  const all = await walkAll(abs);
+  return { files: all.filter((e) => !e.dir).length, dirs: all.filter((e) => e.dir).length, bytes: all.reduce((s, e) => s + e.size, 0) };
+}
+
+/**
+ * Copy a folder tree to `dst` (which must not exist), keeping modes and timestamps. Copies into a
+ * hidden temp folder next to `dst`, checks file count and bytes, then renames it into place, so a
+ * failed copy never leaves a half-filled folder under the real name.
+ */
+export async function copyTree(src: string, dst: string): Promise<void> {
+  if (await exists(dst)) throw new HttpError(409, `Already exists: ${path.basename(dst)}`);
+  await fs.mkdir(path.dirname(dst), { recursive: true });
+  const tmp = path.join(path.dirname(dst), `.io-tmp-${randomUUID()}`);
+  try {
+    await fs.cp(src, tmp, { recursive: true, preserveTimestamps: true, errorOnExist: true, force: false, verbatimSymlinks: true });
+    const [a, b] = await Promise.all([treeStats(src), treeStats(tmp)]);
+    if (a.files !== b.files || a.bytes !== b.bytes) throw new Error(`Copy of ${path.basename(src)} is incomplete (${b.files}/${a.files} files)`);
+    await fs.rename(tmp, dst);
+  } catch (e) {
+    await fs.rm(tmp, { recursive: true, force: true });
+    throw e;
+  }
 }
 
 /**

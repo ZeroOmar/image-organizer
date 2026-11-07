@@ -44,7 +44,12 @@ export type Op =
   | { op: 'move'; step: number; file: FileRef; to: FileRef }
   | { op: 'utimes'; step: number; file: FileRef; mtimeMs: number }
   | { op: 'trash'; step: number; file: FileRef }
-  | { op: 'convert'; step: number; file: FileRef; crf: number; preset: ConvertPreset; minSavingPct: number; duration?: number };
+  | { op: 'convert'; step: number; file: FileRef; crf: number; preset: ConvertPreset; minSavingPct: number; duration?: number }
+  // Folder operations (jobs/folders.ts). `move` and `trash` above also take folders.
+  | { op: 'copy'; step: number; file: FileRef; to: FileRef }
+  | { op: 'delete'; step: number; file: FileRef }
+  | { op: 'chmod'; step: number; file: FileRef; mode: number }
+  | { op: 'chown'; step: number; file: FileRef; uid: number; gid: number };
 
 export interface Plan {
   ops: Op[];

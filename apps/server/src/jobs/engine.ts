@@ -1,4 +1,14 @@
-import { STEP_INFO, isConvertJob, type FileRef, type JobInfo, type JobRequest, type JobStatus, type PlanResult } from '@io/shared';
+import {
+  FOLDER_OP_LABEL,
+  STEP_INFO,
+  isConvertJob,
+  type FileRef,
+  type FolderJobRequestSchema,
+  type JobInfo,
+  type JobRequest,
+  type JobStatus,
+  type PlanResult,
+} from '@io/shared';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import fsSync from 'node:fs';
@@ -6,13 +16,15 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { DB } from '../db/db.js';
 import { encodeHevc, hasX265 } from '../convert/ffmpeg.js';
-import { moveFile, setFileTimes } from '../fs/ops.js';
+import { copyTree, moveFile, setFileTimes } from '../fs/ops.js';
 import type { Roots } from '../fs/roots.js';
 import { HttpError } from '../http/errors.js';
 import type { Indexer } from '../index/indexer.js';
 import type { Metadata, TagMap } from '../metadata/exiftool.js';
 import type { SettingsStore } from '../settings/store.js';
 import type { Trash } from '../trash/trash.js';
+import type { z } from 'zod';
+import { planFolderJob } from './folders.js';
 import { expandSelection, planJob, type Op, type Plan } from './planner.js';
 
 /** How to reverse one executed operation. Applied in reverse order by undo(). */
@@ -22,7 +34,11 @@ type UndoEntry =
   | { t: 'utimes'; file: FileRef; atimeMs: number; mtimeMs: number }
   | { t: 'trash'; id: number }
   /** A converted video replaced `file`; the original is trash item `trashId`. */
-  | { t: 'replace'; file: FileRef; trashId: number };
+  | { t: 'replace'; file: FileRef; trashId: number }
+  /** `file` is a copy made by the job: undo moves it to the trash. */
+  | { t: 'copy'; file: FileRef }
+  | { t: 'chmod'; file: FileRef; mode: number }
+  | { t: 'chown'; file: FileRef; uid: number; gid: number };
 
 type Lane = JobInfo['lane'];
 type Note = { file?: string; message: string };
@@ -122,8 +138,22 @@ export class JobEngine extends EventEmitter {
     const plan = await this.plan(req);
     if (opts.skipIfEmpty && plan.ops.length === 0) return null;
     const title = req.title ?? req.steps.map((s) => STEP_INFO[s.type].label).join(' → ');
+    return this.queue(title, req, plan, isConvertJob(req.steps) ? 'convert' : 'main', ruleId);
+  }
+
+  /** Dry run of a folder operation (rename, move, copy, trash, delete, chmod, chown). */
+  planFolder(req: z.output<typeof FolderJobRequestSchema>): Promise<Plan> {
+    return planFolderJob(req, this.roots);
+  }
+
+  async submitFolder(req: z.output<typeof FolderJobRequestSchema>): Promise<JobInfo> {
+    const plan = await this.planFolder(req);
+    const name = req.folder.rel.split('/').pop() || req.folder.root;
+    return this.queue(`${FOLDER_OP_LABEL[req.op.type]}: ${name}`, req, plan, 'main', null);
+  }
+
+  private queue(title: string, req: unknown, plan: Plan, lane: Lane, ruleId: string | null): JobInfo {
     const id = randomUUID();
-    const lane: Lane = isConvertJob(req.steps) ? 'convert' : 'main';
     this.db
       .prepare('INSERT INTO jobs (id, title, status, request, total, rule_id, lane, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(id, title, 'queued', JSON.stringify(req), plan.ops.length, ruleId, lane, Date.now());
@@ -313,7 +343,30 @@ export class JobEngine extends EventEmitter {
       case 'move': {
         await moveFile(file.abs, this.roots.resolve(op.to).abs);
         undo.push({ t: 'move', from: op.to, to: op.file });
-        this.indexer.invalidate(op.file);
+        this.indexer.invalidatePrefix(op.file.root, op.file.rel);
+        return;
+      }
+      case 'copy': {
+        await copyTree(file.abs, this.roots.resolve(op.to).abs);
+        undo.push({ t: 'copy', file: op.to });
+        return;
+      }
+      case 'delete': {
+        await fs.rm(file.abs, { recursive: true });
+        notes.push({ file: refText(op.file), message: 'Deleted permanently (not undoable)' });
+        this.indexer.invalidatePrefix(op.file.root, op.file.rel);
+        return;
+      }
+      case 'chmod': {
+        const st = await fs.lstat(file.abs);
+        await fs.chmod(file.abs, op.mode);
+        undo.push({ t: 'chmod', file: op.file, mode: st.mode & 0o7777 });
+        return;
+      }
+      case 'chown': {
+        const st = await fs.lstat(file.abs);
+        await fs.lchown(file.abs, op.uid, op.gid);
+        undo.push({ t: 'chown', file: op.file, uid: st.uid, gid: st.gid });
         return;
       }
       case 'utimes': {
@@ -327,7 +380,7 @@ export class JobEngine extends EventEmitter {
       case 'trash': {
         const item = await this.trash.trash(op.file);
         undo.push({ t: 'trash', id: item.id });
-        this.indexer.invalidate(op.file);
+        this.indexer.invalidatePrefix(op.file.root, op.file.rel);
         return;
       }
     }
@@ -370,7 +423,18 @@ export class JobEngine extends EventEmitter {
             break;
           case 'move':
             await moveFile(this.roots.resolve(u.from).abs, this.roots.resolve(u.to).abs);
-            this.indexer.invalidate(u.from);
+            this.indexer.invalidatePrefix(u.from.root, u.from.rel);
+            break;
+          case 'copy':
+            // Undoing a copy trashes it: undo never deletes anything.
+            await this.trash.trash(u.file);
+            this.indexer.invalidatePrefix(u.file.root, u.file.rel);
+            break;
+          case 'chmod':
+            await fs.chmod(this.roots.resolve(u.file).abs, u.mode);
+            break;
+          case 'chown':
+            await fs.lchown(this.roots.resolve(u.file).abs, u.uid, u.gid);
             break;
           case 'utimes':
             await setFileTimes(this.roots.resolve(u.file).abs, new Date(u.atimeMs), new Date(u.mtimeMs));

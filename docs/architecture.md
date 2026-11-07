@@ -46,7 +46,13 @@ POST /api/jobs      → plan again, insert job row, queue execute()
 POST /api/jobs/:id/undo → new job applying UndoEntries in reverse
 ```
 
-Op kinds: `writeTags` (with snapshot), `copyTags`, `rename`, `move`, `utimes`, `trash`, `convert`. Jobs run one at a time (single promise chain), so batches never race. The exception is jobs with a `convert` step: they run on a second serial lane so hour-long encodes don't block everything else, but every file change they make goes through `exclusive()` on the main lane (see [convert.md](convert.md)). Running jobs can be cancelled between ops (and mid-encode). Jobs still `running` at restart are marked `failed`.
+Op kinds: `writeTags` (with snapshot), `copyTags`, `rename`, `move`, `utimes`, `trash`, `convert`, plus the folder ops `copy`, `delete`, `chmod` and `chown`.
+
+Folder operations come from `/api/folders/*`, are planned by `jobs/folders.ts` and submitted with `JobEngine.submitFolder()`:
+- `move` and `trash` take whole folders. A cross-device folder move uses `copyTree` (temp folder, then file count and bytes checked) followed by removing the source.
+- `copy` undoes by trashing the copy.
+- `chmod`/`chown` record the previous mode or owner per entry.
+- `delete` has no undo. Jobs run one at a time (single promise chain), so batches never race. The exception is jobs with a `convert` step: they run on a second serial lane so hour-long encodes don't block everything else, but every file change they make goes through `exclusive()` on the main lane (see [convert.md](convert.md)). Running jobs can be cancelled between ops (and mid-encode). Jobs still `running` at restart are marked `failed`.
 
 ## SQLite schema (`db/db.ts`, append-only `MIGRATIONS`)
 
