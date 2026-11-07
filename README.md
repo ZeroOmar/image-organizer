@@ -144,6 +144,7 @@ Saved in the SQLite database under `/app` and edited on the **Settings** page:
 - issue highlighting (on/off, per check, mismatch tolerance)
 - trash retention override
 - video conversion defaults (quality CRF, encoder preset, which videos to skip)
+- ownership: an owner (uid/gid) and file/folder modes given to every file and folder the app creates or changes (off by default)
 
 The page also shows the static config read-only, with secrets masked.
 
@@ -388,6 +389,8 @@ docker run --rm ghcr.io/zeroomar/image-organizer:latest node -e \
 **Similar scene says it couldn't download the model**: the first similar-scene scan downloads the CLIP model (~90 MB) from Hugging Face. Without internet access, download `vision_model_quantized.onnx` from `Xenova/clip-vit-base-patch32` yourself and set `similar.modelPath`, or turn the mode off with `similar.enabled: false`.
 
 **chown/chmod rows show “can't be changed by the app's user”**: the app runs as `PUID`, and Linux only lets a file's owner change its permissions, and only root change its owner. Set `PUID`/`PGID` to the owner of the share, or run the container with `PUID=0` to change owners.
+
+**Files written by the app end up owned by root** (with `PUID=0`, e.g. after a metadata write, a conversion or an upload): turn on **Settings → Ownership** and set the share's owner and modes (**Use the media folder's** fills them in). The app then applies them to everything it creates or changes; a change it isn't allowed to make becomes a note on the job.
 
 **A tag edit fails with "Nothing was written"**: that tag is read-only for this file type (e.g. `Composite:*`, `File:*`).
 

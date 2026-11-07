@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CONVERT_PRESETS } from './api.js';
+import { octalMode, posixId } from './folders.js';
 
 export const ISSUE_CHECK_IDS = [
   'missingOriginalDate',
@@ -57,6 +58,19 @@ export const SettingsSchema = z.object({
       minBitrateMbps: z.number().min(0).default(10),
       /** Keep the original when the result isn't at least this much smaller. */
       minSavingPct: z.number().int().min(0).max(95).default(20),
+    })
+    .prefault({}),
+  /**
+   * Owner and mode given to every file and folder the app creates or changes (jobs, undo, uploads,
+   * new folders, trash and restore). null leaves that part as the write left it.
+   */
+  ownership: z
+    .object({
+      enabled: z.boolean().default(false),
+      uid: posixId.nullable().default(null),
+      gid: posixId.nullable().default(null),
+      fileMode: octalMode.nullable().default(null),
+      dirMode: octalMode.nullable().default(null),
     })
     .prefault({}),
 });

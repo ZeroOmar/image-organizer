@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { DB } from '../db/db.js';
 import { moveFile, treeStats, uniqueName } from '../fs/ops.js';
+import type { Ownership, Warn } from '../fs/ownership.js';
 import { dirOfRel, joinRel, nameOfRel, type Roots } from '../fs/roots.js';
 import { HttpError } from '../http/errors.js';
 
@@ -32,19 +33,21 @@ export class Trash {
   constructor(
     private db: DB,
     private roots: Roots,
+    private own: Ownership,
   ) {}
 
-  async trash(ref: FileRef): Promise<TrashItem> {
+  async trash(ref: FileRef, warn?: Warn): Promise<TrashItem> {
     if (ref.root === 'trash') throw new HttpError(400, 'Already in trash');
     const src = this.roots.resolve(ref);
     const st = await fs.stat(src.abs);
     const size = st.isDirectory() ? (await treeStats(src.abs)).bytes : st.size;
     const wantDir = joinRel(ref.root, dirOfRel(src.rel));
     const dstDir = this.roots.resolve({ root: 'trash', rel: wantDir });
-    await fs.mkdir(dstDir.abs, { recursive: true });
+    await this.own.mkdirp(dstDir.abs, warn);
     const name = await uniqueName(dstDir.abs, nameOfRel(src.rel));
     const trashRel = joinRel(wantDir, name);
     await moveFile(src.abs, path.join(dstDir.abs, name));
+    await this.own.apply(path.join(dstDir.abs, name), warn);
     const info = this.db
       .prepare('INSERT INTO trash_items (origin_root, original_rel, trash_rel, size, deleted_at) VALUES (?, ?, ?, ?, ?)')
       .run(ref.root, src.rel, trashRel, size, Date.now());
@@ -52,13 +55,14 @@ export class Trash {
   }
 
   /** Restore to the original path; if that name is taken now, use name_1.ext etc. Returns the restored ref. */
-  async restore(id: number): Promise<FileRef> {
+  async restore(id: number, warn?: Warn): Promise<FileRef> {
     const row = this.get(id);
     const src = this.roots.resolve({ root: 'trash', rel: row.trash_rel });
     const dstDir = this.roots.resolve({ root: row.origin_root, rel: dirOfRel(row.original_rel) });
-    await fs.mkdir(dstDir.abs, { recursive: true });
+    await this.own.mkdirp(dstDir.abs, warn);
     const name = await uniqueName(dstDir.abs, nameOfRel(row.original_rel));
     await moveFile(src.abs, path.join(dstDir.abs, name));
+    await this.own.apply(path.join(dstDir.abs, name), warn);
     this.db.prepare('DELETE FROM trash_items WHERE id = ?').run(id);
     return { root: row.origin_root, rel: joinRel(dstDir.rel, name) };
   }

@@ -26,6 +26,7 @@
 | `Metadata` | `metadata/exiftool.ts` | ExifTool pool (exiftool-vendored, 4 procs): read, grouped read, snapshot, write, copy, embedded preview |
 | `Indexer` | `index/indexer.ts` | `getEntry()` = stat + cached metadata (SQLite `media_cache`, keyed by size+mtime); `enrich()` adds `resolved` + `issues` |
 | `Thumbs` | `thumbs/thumbs.ts` | JPEG thumbs/previews cached in `/app/cache/thumbs` (sharp → ffmpeg → embedded JPEG) |
+| `Ownership` | `fs/ownership.ts` | Settings → Ownership: `apply()` (recursive for folders), `mkdirp()` (only new folders), `wrote()`; failures become one job note, never an error |
 | `Trash` | `trash/trash.ts` | `/trash/<origin>/<rel>` + `trash_items` rows; restore/purge |
 | `JobEngine` | `jobs/engine.ts` | Plans and executes jobs serially; undo; emits `job` events for SSE |
 | `DupeScanner` | `dupes/scanner.ts` | Read-only duplicate/similar scans (SHA-256, dHash, CLIP via `dupes/clip.ts`), hashes cached in `media_hash`; emits `scan` events for SSE ([duplicates.md](duplicates.md)) |

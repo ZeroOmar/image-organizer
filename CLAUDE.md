@@ -50,11 +50,12 @@ The server dev loop resolves `@io/shared` to TS source via the `development` exp
 1. **Paths**: always `roots.resolve({root, rel})`. Never join user paths yourself. Moves between roots happen only through the `move` step, folder move/copy (Folders pane menu, media ↔ import) and trash/restore.
 2. **Mutations**: everything that changes files is a **step** run by the **job engine**: plan (dry run) → submit → serial execution → undo entries. Don't write files from route handlers. Folder operations (rename/move/copy/trash/delete/chmod/chown, `jobs/folders.ts`) are jobs too (`jobs.submitFolder()`). Trash restore/purge use `jobs.exclusive()`. Jobs with a `convert` step run on a second lane (long encodes only read the original); every file change they make still runs on the main lane through `exclusive()`.
 3. **Undo**: every op records an inverse (tag snapshot, reverse move, previous mtime, trash id). New ops must too.
-4. **ExifTool**: only through `metadata/exiftool.ts`. Writes use `-overwrite_original -P` (keep mtime) and call `indexer.invalidate()` afterwards; the job engine already does this.
-5. **GPS writes**: photos use signed decimals **without** `-n` (exiftool-vendored adds a GPSPosition that `-n` breaks). Videos (`Keys:GPSCoordinates`) need `-n`. See `metadata/tags.ts`.
-6. **Dates**: EXIF dates are local wall time plus `OffsetTime*`; QuickTime dates are UTC. Resolve with `resolveDate()` from shared; never parse dates ad hoc.
-7. **UI**: colors and spacing come only from `theme/tokens.css`. Dark only. The primary action is Nomad green with dark text. The logo's colors are never reused as UI colors.
-8. **Settings vs config**: static config (env) is read-only in the UI; dynamic settings (`SettingsSchema`) live in SQLite and are edited on the Settings page.
+4. **Ownership**: anything that creates or changes a file or folder applies Settings → Ownership via `ctx.ownership` (`fs/ownership.ts`: `apply`, `mkdirp`, `wrote`); the engine, trash, upload and new-folder routes already do. Explicit chmod/chown ops don't, and it is never undone.
+5. **ExifTool**: only through `metadata/exiftool.ts`. Writes use `-overwrite_original -P` (keep mtime) and call `indexer.invalidate()` afterwards; the job engine already does this.
+6. **GPS writes**: photos use signed decimals **without** `-n` (exiftool-vendored adds a GPSPosition that `-n` breaks). Videos (`Keys:GPSCoordinates`) need `-n`. See `metadata/tags.ts`.
+7. **Dates**: EXIF dates are local wall time plus `OffsetTime*`; QuickTime dates are UTC. Resolve with `resolveDate()` from shared; never parse dates ad hoc.
+8. **UI**: colors and spacing come only from `theme/tokens.css`. Dark only. The primary action is Nomad green with dark text. The logo's colors are never reused as UI colors.
+9. **Settings vs config**: static config (env) is read-only in the UI; dynamic settings (`SettingsSchema`) live in SQLite and are edited on the Settings page.
 
 ## Where to read next
 

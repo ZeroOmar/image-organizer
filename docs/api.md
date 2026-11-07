@@ -71,7 +71,7 @@ Scanning is read-only; resolving a group is a normal `trash` job. See [duplicate
 ## Admin
 | | |
 |---|---|
-| `GET /config` | `PublicConfig` (map, default tz, limits, roots) |
+| `GET /config` | `PublicConfig` (map, default tz, limits, roots, `appUser` uid/gid, `mediaOwner` uid/gid/mode of the media root) |
 | `GET /config/static` | merged static config, secrets masked |
 | `GET /settings` · `PUT /settings` | `Settings` |
 | `GET /trash` | `TrashItem[]` |

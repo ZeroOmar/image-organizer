@@ -1,5 +1,6 @@
 import type { AppConfig } from './config/schema.js';
 import type { DB } from './db/db.js';
+import type { Ownership } from './fs/ownership.js';
 import type { Roots } from './fs/roots.js';
 import type { Indexer } from './index/indexer.js';
 import type { JobEngine } from './jobs/engine.js';
@@ -17,6 +18,8 @@ export interface AppContext {
   db: DB;
   roots: Roots;
   settings: SettingsStore;
+  /** Settings → Ownership, applied to everything the app writes. */
+  ownership: Ownership;
   metadata: Metadata;
   indexer: Indexer;
   thumbs: Thumbs;

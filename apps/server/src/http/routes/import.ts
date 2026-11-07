@@ -20,7 +20,7 @@ export function importRoutes(app: FastifyInstance, ctx: AppContext) {
   app.post('/api/import/upload', async (req) => {
     const q = parse(z.object({ rel: z.string().default(''), lastModified: z.coerce.number().optional() }), req.query);
     const dir = ctx.roots.resolve({ root: 'import', rel: q.rel });
-    await fs.mkdir(dir.abs, { recursive: true });
+    await ctx.ownership.mkdirp(dir.abs);
     const part = await req.file();
     if (!part) throw new HttpError(400, 'No file in request');
     const original = path.basename(part.filename || 'upload');
@@ -38,6 +38,7 @@ export function importRoutes(app: FastifyInstance, ctx: AppContext) {
         const t = new Date(q.lastModified);
         await fs.utimes(path.join(dir.abs, name), t, t).catch(() => undefined);
       }
+      await ctx.ownership.apply(path.join(dir.abs, name));
       return { root: 'import', rel: joinRel(dir.rel, name) };
     } catch (e) {
       await fs.rm(tmp, { force: true });

@@ -5,6 +5,7 @@ import { openDb } from './db/db.js';
 import { ClipModel } from './dupes/clip.js';
 import { HashStore } from './dupes/hashes.js';
 import { DupeScanner } from './dupes/scanner.js';
+import { Ownership } from './fs/ownership.js';
 import { Roots } from './fs/roots.js';
 import { Indexer } from './index/indexer.js';
 import { JobEngine } from './jobs/engine.js';
@@ -22,9 +23,10 @@ export function createContext(config: AppConfig, appDir: string): AppContext & {
   const metadata = new Metadata();
   const indexer = new Indexer(db, roots, metadata, settings, config.timezone.default);
   const thumbs = new Thumbs(appDir, roots, metadata);
-  const trash = new Trash(db, roots);
-  const jobs = new JobEngine(db, roots, indexer, metadata, trash, settings, config.timezone.default);
+  const ownership = new Ownership(() => settings.get().ownership);
+  const trash = new Trash(db, roots, ownership);
+  const jobs = new JobEngine(db, roots, indexer, metadata, trash, settings, ownership, config.timezone.default);
   const automation = new Automation(db, roots, jobs);
   const dupes = new DupeScanner(roots, indexer, thumbs, new HashStore(db), new ClipModel(config.similar, appDir));
-  return { config, appDir, db, roots, settings, metadata, indexer, thumbs, trash, jobs, automation, dupes, devices };
+  return { config, appDir, db, roots, settings, ownership, metadata, indexer, thumbs, trash, jobs, automation, dupes, devices };
 }

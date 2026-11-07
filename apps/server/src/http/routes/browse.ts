@@ -48,6 +48,7 @@ export function browseRoutes(app: FastifyInstance, ctx: AppContext) {
     await fs.mkdir(target.abs, { recursive: false }).catch((e: NodeJS.ErrnoException) => {
       throw new HttpError(e.code === 'EEXIST' ? 409 : 500, e.code === 'EEXIST' ? 'Folder already exists' : e.message);
     });
+    await ctx.ownership.apply(target.abs);
     return { root: target.root, rel: target.rel };
   });
 

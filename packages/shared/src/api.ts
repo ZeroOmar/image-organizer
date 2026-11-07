@@ -200,4 +200,8 @@ export interface PublicConfig {
   convertAvailable: boolean;
   /** False when `similar.enabled` is off; the Similar scene mode is hidden. */
   similarAvailable: boolean;
+  /** The user the app runs as (PUID/PGID). Only uid 0 can give files another owner. */
+  appUser: { uid: number; gid: number };
+  /** Owner and mode of the media root, offered as values for Settings → Ownership. */
+  mediaOwner: { uid: number; gid: number; mode: string } | null;
 }

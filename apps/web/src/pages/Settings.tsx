@@ -8,6 +8,7 @@ import {
   previewTemplate,
   type ConvertPreset,
   type DateSourceId,
+  type PublicConfig,
   type Settings,
 } from '@io/shared';
 import { useQuery } from '@tanstack/react-query';
@@ -63,7 +64,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
         </button>
         <button
           className="btn btn-primary"
-          disabled={!dirty || tplErrors.length > 0 || save.isPending}
+          disabled={!dirty || tplErrors.length > 0 || !ownershipValid(s.ownership) || save.isPending}
           onClick={() => save.mutate(s, { onSuccess: () => setSaved(true) })}
         >
           Save changes
@@ -365,8 +366,97 @@ function SettingsForm({ initial }: { initial: Settings }) {
         </div>
       </section>
 
+      <Ownership value={s.ownership} onChange={(v) => set('ownership', v)} config={config} />
+
       <StaticConfig />
     </div>
+  );
+}
+
+const OCTAL = /^[0-7]{3,4}$/;
+const ownershipValid = (o: Settings['ownership']) => [o.fileMode, o.dirMode].every((m) => m === null || OCTAL.test(m));
+
+function Ownership({ value: o, onChange, config }: { value: Settings['ownership']; onChange: (v: Settings['ownership']) => void; config?: PublicConfig }) {
+  const user = config?.appUser;
+  const media = config?.mediaOwner;
+  const idInput = (k: 'uid' | 'gid') => (
+    <input
+      className="input"
+      type="number"
+      min={0}
+      placeholder="Leave as written"
+      value={o[k] ?? ''}
+      disabled={!o.enabled}
+      onChange={(e) => onChange({ ...o, [k]: e.target.value === '' ? null : Math.max(0, Math.trunc(Number(e.target.value) || 0)) })}
+    />
+  );
+  const modeInput = (k: 'fileMode' | 'dirMode', example: string) => (
+    <>
+      <input
+        className="input mono"
+        placeholder={`Leave as written, e.g. ${example}`}
+        value={o[k] ?? ''}
+        disabled={!o.enabled}
+        onChange={(e) => onChange({ ...o, [k]: e.target.value.trim() === '' ? null : e.target.value.trim() })}
+      />
+      {o[k] !== null && !OCTAL.test(o[k]!) && <span className="error-text caption">Use an octal mode such as {example}.</span>}
+    </>
+  );
+  return (
+    <section className="section">
+      <span className="eyebrow">Ownership</span>
+      <div className="card stack">
+        <p className="muted" style={{ margin: 0 }}>
+          Give every file and folder the app creates or changes (batch actions, renames, moves, conversions, uploads, new folders, trash and
+          restore) this owner and mode, so files written by the app stay usable by the share's other users. It isn't undone with a job.
+        </p>
+        <label className="check">
+          <input type="checkbox" checked={o.enabled} onChange={(e) => onChange({ ...o, enabled: e.target.checked })} />
+          Set owner and permissions on files the app writes
+        </label>
+        <div className="grid-2">
+          <div className="field">
+            <label>Owner (uid)</label>
+            {idInput('uid')}
+          </div>
+          <div className="field">
+            <label>Group (gid)</label>
+            {idInput('gid')}
+          </div>
+          <div className="field">
+            <label>File mode</label>
+            {modeInput('fileMode', '664')}
+          </div>
+          <div className="field">
+            <label>Folder mode</label>
+            {modeInput('dirMode', '775')}
+          </div>
+        </div>
+        <div className="row" style={{ gap: 8 }}>
+          {media && (
+            <button
+              className="btn btn-sm"
+              disabled={!o.enabled}
+              onClick={() =>
+                onChange({ ...o, uid: media.uid, gid: media.gid, dirMode: media.mode, fileMode: (parseInt(media.mode, 8) & 0o666).toString(8) })
+              }
+            >
+              Use the media folder's ({media.uid}:{media.gid}, {media.mode})
+            </button>
+          )}
+          {user && (
+            <span className="hint grow">
+              The app runs as uid {user.uid}, gid {user.gid}.
+            </span>
+          )}
+        </div>
+        {o.enabled && user && user.uid !== 0 && o.uid !== null && o.uid !== user.uid && (
+          <span className="warning-text caption">
+            Only root can give files another owner, so those changes will fail. Run the container with PUID=0, or leave uid and gid empty.
+          </span>
+        )}
+      </div>
+    </section>
   );
 }
 

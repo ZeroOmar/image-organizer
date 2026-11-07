@@ -17,6 +17,7 @@ import path from 'node:path';
 import type { DB } from '../db/db.js';
 import { encodeHevc, hasX265 } from '../convert/ffmpeg.js';
 import { copyTree, moveFile, setFileTimes } from '../fs/ops.js';
+import type { Ownership, Warn } from '../fs/ownership.js';
 import type { Roots } from '../fs/roots.js';
 import { HttpError } from '../http/errors.js';
 import type { Indexer } from '../index/indexer.js';
@@ -43,11 +44,27 @@ type UndoEntry =
 type Lane = JobInfo['lane'];
 type Note = { file?: string; message: string };
 
+/** Collects a job's Settings → Ownership failures into a single note (there can be thousands). */
+function ownershipWarnings(notes: Note[]) {
+  let count = 0;
+  let first = '';
+  return {
+    warn: ((abs, message) => {
+      if (!count++) first = `${path.basename(abs)}: ${message}`;
+    }) as Warn,
+    flush: () => {
+      if (count) notes.push({ message: `Settings → Ownership couldn't be applied to ${count} item(s), e.g. ${first}` });
+    },
+  };
+}
+
 /** Per-run state handed to runOp. */
 interface Run {
   lane: Lane;
   signal: AbortSignal;
   notes: Note[];
+  /** Settings → Ownership failures; summed up in one note when the job ends. */
+  warn: Warn;
   saved: { bytes: number };
   onProgress: (file: FileRef, pct: number) => void;
 }
@@ -111,6 +128,7 @@ export class JobEngine extends EventEmitter {
     private metadata: Metadata,
     private trash: Trash,
     private settings: SettingsStore,
+    private own: Ownership,
     private defaultTz: string,
   ) {
     super();
@@ -232,7 +250,9 @@ export class JobEngine extends EventEmitter {
     let done = 0;
     let lastEmit = 0;
     this.update(id, { status: 'running' });
-    const run: Run = { lane, signal: ac.signal, notes: [], saved: { bytes: 0 }, onProgress: () => undefined };
+    const notes: Note[] = [];
+    const ownWarn = ownershipWarnings(notes);
+    const run: Run = { lane, signal: ac.signal, notes, warn: ownWarn.warn, saved: { bytes: 0 }, onProgress: () => undefined };
     const progress = (force = false) => {
       if (force || Date.now() - lastEmit > 250) {
         lastEmit = Date.now();
@@ -251,13 +271,13 @@ export class JobEngine extends EventEmitter {
         let j = i;
         while (j < ops.length && ops[j].op === 'rename' && ops[j].step === op.step) j++;
         const batch = ops.slice(i, j) as Extract<Op, { op: 'rename' }>[];
-        await this.onMain(lane, () => this.renameBatch(batch, undo, errors));
+        await this.onMain(lane, () => this.renameBatch(batch, undo, errors, run.warn));
         done += batch.length;
         i = j;
       } else {
         try {
           if (op.op === 'convert') await this.convert(op, undo, run);
-          else await this.onMain(lane, () => this.runOp(op, undo, run.notes));
+          else await this.onMain(lane, () => this.runOp(op, undo, run));
         } catch (e) {
           if (!ac.signal.aborted) errors.push({ file: refText(op.file), message: (e as Error).message });
         }
@@ -269,6 +289,7 @@ export class JobEngine extends EventEmitter {
     }
     this.running.delete(id);
     this.current.delete(id);
+    ownWarn.flush();
     progress(true);
     this.update(id, {
       status: ac.signal.aborted ? 'cancelled' : errors.length && errors.length >= ops.length && ops.length > 0 ? 'failed' : 'done',
@@ -308,13 +329,14 @@ export class JobEngine extends EventEmitter {
         if (now.size !== before.size || now.mtimeMs !== before.mtimeMs) throw new Error('The file changed while it was being converted; kept the original');
         await this.metadata.copyAllFrom(file.abs, tmp);
         await fs.utimes(tmp, before.atime, before.mtime);
-        const item = await this.trash.trash(op.file);
+        const item = await this.trash.trash(op.file, run.warn);
         try {
           await moveFile(tmp, file.abs);
         } catch (e) {
-          await this.trash.restore(item.id);
+          await this.trash.restore(item.id, run.warn);
           throw e;
         }
+        await this.own.apply(file.abs, run.warn);
         undo.push({ t: 'replace', file: op.file, trashId: item.id });
         this.indexer.invalidate(op.file);
       });
@@ -325,13 +347,14 @@ export class JobEngine extends EventEmitter {
     }
   }
 
-  private async runOp(op: Exclude<Op, { op: 'rename' | 'convert' }>, undo: UndoEntry[], notes: Note[]): Promise<void> {
+  private async runOp(op: Exclude<Op, { op: 'rename' | 'convert' }>, undo: UndoEntry[], { notes, warn }: Run): Promise<void> {
     const file = this.roots.resolve(op.file);
     const note = (r: { repaired?: string }) => r.repaired && notes.push({ file: refText(op.file), message: r.repaired });
     switch (op.op) {
       case 'writeTags': {
         const values = await this.metadata.snapshot(file.abs, op.snapshot);
         note(await this.metadata.write(file.abs, op.tags, { numeric: op.numeric }));
+        await this.own.apply(file.abs, warn);
         undo.push({ t: 'tags', file: op.file, values });
         this.indexer.invalidate(op.file);
         return;
@@ -339,18 +362,21 @@ export class JobEngine extends EventEmitter {
       case 'copyTags': {
         const values = await this.metadata.snapshot(file.abs, op.tags);
         note(await this.metadata.copyFrom(this.roots.resolve(op.source).abs, file.abs, op.tags));
+        await this.own.apply(file.abs, warn);
         undo.push({ t: 'tags', file: op.file, values });
         this.indexer.invalidate(op.file);
         return;
       }
       case 'move': {
-        await moveFile(file.abs, this.roots.resolve(op.to).abs);
+        const to = this.roots.resolve(op.to).abs;
+        await this.own.wrote(to, () => moveFile(file.abs, to), warn);
         undo.push({ t: 'move', from: op.to, to: op.file });
         this.indexer.invalidatePrefix(op.file.root, op.file.rel);
         return;
       }
       case 'copy': {
-        await copyTree(file.abs, this.roots.resolve(op.to).abs);
+        const to = this.roots.resolve(op.to).abs;
+        await this.own.wrote(to, () => copyTree(file.abs, to), warn);
         undo.push({ t: 'copy', file: op.to });
         return;
       }
@@ -377,11 +403,12 @@ export class JobEngine extends EventEmitter {
         if (await setFileTimes(file.abs, new Date(op.mtimeMs), new Date(op.mtimeMs))) {
           notes.push({ file: refText(op.file), message: `Owned by another user (uid ${st.uid}); replaced with an identical copy owned by the app to set its date` });
         }
+        await this.own.apply(file.abs, warn);
         undo.push({ t: 'utimes', file: op.file, atimeMs: st.atimeMs, mtimeMs: st.mtimeMs });
         return;
       }
       case 'trash': {
-        const item = await this.trash.trash(op.file);
+        const item = await this.trash.trash(op.file, warn);
         undo.push({ t: 'trash', id: item.id });
         this.indexer.invalidatePrefix(op.file.root, op.file.rel);
         return;
@@ -389,7 +416,7 @@ export class JobEngine extends EventEmitter {
     }
   }
 
-  private async renameBatch(batch: Extract<Op, { op: 'rename' }>[], undo: UndoEntry[], errors: Note[]) {
+  private async renameBatch(batch: Extract<Op, { op: 'rename' }>[], undo: UndoEntry[], errors: Note[], warn: Warn) {
     const staged: { op: (typeof batch)[number]; tmp: string; src: string }[] = [];
     for (const op of batch) {
       try {
@@ -403,7 +430,8 @@ export class JobEngine extends EventEmitter {
     }
     for (const { op, tmp, src } of staged) {
       try {
-        await moveFile(tmp, this.roots.resolve(op.to).abs);
+        const to = this.roots.resolve(op.to).abs;
+        await this.own.wrote(to, () => moveFile(tmp, to), warn);
         undo.push({ t: 'move', from: op.to, to: op.file });
         this.indexer.invalidate(op.file);
       } catch (e) {
@@ -415,6 +443,8 @@ export class JobEngine extends EventEmitter {
 
   private async runUndo(id: string, entries: UndoEntry[]): Promise<void> {
     const errors: Note[] = [];
+    const notes: Note[] = [];
+    const { warn, flush } = ownershipWarnings(notes);
     this.update(id, { status: 'running' });
     let done = 0;
     for (const u of entries) {
@@ -422,15 +452,18 @@ export class JobEngine extends EventEmitter {
         switch (u.t) {
           case 'tags':
             await this.metadata.write(this.roots.resolve(u.file).abs, u.values);
+            await this.own.apply(this.roots.resolve(u.file).abs, warn);
             this.indexer.invalidate(u.file);
             break;
-          case 'move':
-            await moveFile(this.roots.resolve(u.from).abs, this.roots.resolve(u.to).abs);
+          case 'move': {
+            const to = this.roots.resolve(u.to).abs;
+            await this.own.wrote(to, () => moveFile(this.roots.resolve(u.from).abs, to), warn);
             this.indexer.invalidatePrefix(u.from.root, u.from.rel);
             break;
+          }
           case 'copy':
             // Undoing a copy trashes it: undo never deletes anything.
-            await this.trash.trash(u.file);
+            await this.trash.trash(u.file, warn);
             this.indexer.invalidatePrefix(u.file.root, u.file.rel);
             break;
           case 'chmod':
@@ -441,15 +474,16 @@ export class JobEngine extends EventEmitter {
             break;
           case 'utimes':
             await setFileTimes(this.roots.resolve(u.file).abs, new Date(u.atimeMs), new Date(u.mtimeMs));
+            await this.own.apply(this.roots.resolve(u.file).abs, warn);
             break;
           case 'trash':
-            await this.trash.restore(u.id);
+            await this.trash.restore(u.id, warn);
             break;
           case 'replace':
             // The converted file goes to the trash too, so undo never deletes anything.
-            await this.trash.trash(u.file);
+            await this.trash.trash(u.file, warn);
             this.indexer.invalidate(u.file);
-            await this.trash.restore(u.trashId);
+            await this.trash.restore(u.trashId, warn);
             break;
         }
       } catch (e) {
@@ -458,6 +492,7 @@ export class JobEngine extends EventEmitter {
       done++;
       this.update(id, { done, errors: JSON.stringify(errors) });
     }
-    this.update(id, { status: errors.length === entries.length && entries.length > 0 ? 'failed' : 'done', finished_at: Date.now() });
+    flush();
+    this.update(id, { notes: JSON.stringify(notes), status: errors.length === entries.length && entries.length > 0 ? 'failed' : 'done', finished_at: Date.now() });
   }
 }

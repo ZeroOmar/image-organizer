@@ -1,5 +1,6 @@
 import type { PublicConfig } from '@io/shared';
 import type { FastifyInstance } from 'fastify';
+import fs from 'node:fs/promises';
 import { z } from 'zod';
 import type { AppContext } from '../../context.js';
 import { hasX265 } from '../../convert/ffmpeg.js';
@@ -19,6 +20,11 @@ export function adminRoutes(app: FastifyInstance, ctx: AppContext) {
     roots: ctx.roots.dirs,
     convertAvailable: await hasX265(),
     similarAvailable: ctx.config.similar.enabled,
+    appUser: { uid: process.getuid?.() ?? 0, gid: process.getgid?.() ?? 0 },
+    mediaOwner: await fs.stat(ctx.roots.dirs.media).then(
+      (st) => ({ uid: st.uid, gid: st.gid, mode: (st.mode & 0o777).toString(8) }),
+      () => null,
+    ),
   }));
 
   /** Static config with secrets masked, for the read-only view in Settings. */

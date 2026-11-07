@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { FileRefSchema } from './api.js';
 
-const octal = z.string().regex(/^[0-7]{3,4}$/, 'must be an octal mode like 755');
-const id = z.number().int().min(0).max(2 ** 31 - 1);
+export const octalMode = z.string().regex(/^[0-7]{3,4}$/, 'must be an octal mode like 755');
+export const posixId = z.number().int().min(0).max(2 ** 31 - 1);
 
 /**
  * Operations on a whole folder (Folders pane context menu). Each runs as a job with a dry run and,
@@ -16,8 +16,8 @@ export const FolderOpSchema = z.discriminatedUnion('type', [
   /** Permanent: not undoable. */
   z.object({ type: z.literal('delete') }),
   /** Modes for the folder and subfolders (`dirMode`) and for files (`fileMode`); either can be left out. */
-  z.object({ type: z.literal('chmod'), dirMode: octal.optional(), fileMode: octal.optional(), recursive: z.boolean().default(true) }),
-  z.object({ type: z.literal('chown'), uid: id.optional(), gid: id.optional(), recursive: z.boolean().default(true) }),
+  z.object({ type: z.literal('chmod'), dirMode: octalMode.optional(), fileMode: octalMode.optional(), recursive: z.boolean().default(true) }),
+  z.object({ type: z.literal('chown'), uid: posixId.optional(), gid: posixId.optional(), recursive: z.boolean().default(true) }),
 ]);
 export type FolderOp = z.infer<typeof FolderOpSchema>;
 
