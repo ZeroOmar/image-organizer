@@ -9,6 +9,7 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 RUN npm ci
 COPY tsconfig.base.json ./
 COPY packages packages
