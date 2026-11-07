@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
+import { decodeImage } from '../convert/heif.js';
 import type { Roots } from '../fs/roots.js';
 import type { Metadata } from '../metadata/exiftool.js';
 
@@ -29,7 +30,7 @@ export class Limit {
 
 /**
  * JPEG thumbnails and previews, cached under /app/cache/thumbs by (path, size, mtime).
- * Photos: sharp (auto-rotated) → ffmpeg → embedded JPEG. Videos: one ffmpeg frame.
+ * Photos: sharp (auto-rotated) → full ffmpeg decode (HEIC) → embedded JPEG. Videos: one ffmpeg frame.
  * Originals are never modified; video preview streams the original file (no transcoding).
  */
 export class Thumbs {
@@ -69,17 +70,23 @@ export class Thumbs {
     const tmp = `${out}.${randomUUID()}.tmp`;
     try {
       if (kindOf(abs) === 'video') {
-        await this.ffmpegFrame(abs, tmp, size, true);
+        await this.ffmpegFrame(abs, tmp, size);
       } else {
+        const fit = { fit: 'inside', withoutEnlargement: true } as const;
         try {
-          await sharp(abs, { failOn: 'none' }).rotate().resize(size, size, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toFile(tmp);
+          await sharp(abs, { failOn: 'none' }).rotate().resize(size, size, fit).jpeg({ quality: 82 }).toFile(tmp);
         } catch {
           try {
-            await this.ffmpegFrame(abs, tmp, size, false);
-          } catch {
+            // Already upright (HEIF rotation applied by ffmpeg); the PNG carries no Orientation.
+            await sharp(await decodeImage(abs)).resize(size, size, fit).jpeg({ quality: 82 }).toFile(tmp);
+          } catch (decodeErr) {
             const emb = `${tmp}.emb.jpg`;
-            await this.metadata.extractEmbeddedJpeg(abs, emb);
-            await sharp(emb).rotate().resize(size, size, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toFile(tmp);
+            try {
+              await this.metadata.extractEmbeddedJpeg(abs, emb);
+            } catch {
+              throw decodeErr;
+            }
+            await sharp(emb).rotate().resize(size, size, fit).jpeg({ quality: 82 }).toFile(tmp);
             await fs.rm(emb, { force: true });
           }
         }
@@ -92,10 +99,10 @@ export class Thumbs {
     }
   }
 
-  private async ffmpegFrame(abs: string, out: string, size: number, seek: boolean): Promise<void> {
+  private async ffmpegFrame(abs: string, out: string, size: number): Promise<void> {
     const args = [
       '-v', 'error', '-y',
-      ...(seek ? ['-ss', '0.5'] : []),
+      '-ss', '0.5',
       '-i', abs,
       '-frames:v', '1',
       '-vf', `scale='min(${size},iw)':'min(${size},ih)':force_original_aspect_ratio=decrease`,

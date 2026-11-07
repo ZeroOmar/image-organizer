@@ -8,6 +8,7 @@ import {
   formatDisplay,
   formatExifDate,
   formatOffset,
+  isHeif,
   isValidZone,
   parseIsoLocal,
   parseTemplate,
@@ -45,6 +46,7 @@ export type Op =
   | { op: 'utimes'; step: number; file: FileRef; mtimeMs: number }
   | { op: 'trash'; step: number; file: FileRef }
   | { op: 'convert'; step: number; file: FileRef; crf: number; preset: ConvertPreset; minSavingPct: number; duration?: number }
+  | { op: 'heicToJpeg'; step: number; file: FileRef; to: FileRef; quality: number }
   // Folder operations (jobs/folders.ts). `move` and `trash` above also take folders.
   | { op: 'copy'; step: number; file: FileRef; to: FileRef }
   | { op: 'delete'; step: number; file: FileRef }
@@ -344,6 +346,26 @@ async function planStep(step: number, s: Step, files: VFile[], plan: Plan, d: Pl
       return;
     }
 
+    case 'heicToJpeg': {
+      const quality = s.quality ?? d.settings.convert.jpegQuality;
+      const taken = new Map<string, Set<string>>();
+      let other = 0;
+      for (const v of files) {
+        if (!isHeif(v.entry.name)) {
+          other++;
+          continue;
+        }
+        const dir = { root: v.cur.root, rel: dirOfRel(v.cur.rel) };
+        const name = freeName(await takenNames(taken, dir, d), `${baseOf(v.entry.name)}.jpg`);
+        const to = { root: dir.root, rel: joinRel(dir.rel, name) };
+        plan.ops.push({ op: 'heicToJpeg', step, file: { ...v.cur }, to, quality });
+        item(v, { before: v.entry.name, after: `${name} (quality ${quality})` });
+        setCur(v, to);
+      }
+      if (other) plan.warnings.push(`${other} file(s) skipped: not HEIC/HEIF`);
+      return;
+    }
+
     case 'trash':
       for (const v of files) {
         plan.ops.push({ op: 'trash', step, file: { ...v.cur } });
@@ -352,6 +374,25 @@ async function planStep(step: number, s: Step, files: VFile[], plan: Plan, d: Pl
       }
       return;
   }
+}
+
+/** Lower-case names in `dir` (listed once per plan), including names this plan already claimed. */
+async function takenNames(cache: Map<string, Set<string>>, dir: FileRef, d: PlannerDeps): Promise<Set<string>> {
+  const key = `${dir.root}\u0000${dir.rel}`;
+  let names = cache.get(key);
+  if (!names) {
+    const listing = await listDir(d.roots.resolve(dir).abs).catch(() => null);
+    cache.set(key, (names = new Set(listing?.allNames ?? [])));
+  }
+  return names;
+}
+
+/** `name`, or name_1.ext, name_2.ext … when taken; claims the result in `names`. */
+function freeName(names: Set<string>, name: string): string {
+  let candidate = name;
+  for (let i = 1; names.has(candidate.toLowerCase()); i++) candidate = `${baseOf(name)}_${i}${name.slice(baseOf(name).length)}`;
+  names.add(candidate.toLowerCase());
+  return candidate;
 }
 
 /** Moves never overwrite: a taken name becomes name_1.ext, name_2.ext … */
@@ -375,16 +416,7 @@ async function planMoves(
       continue;
     }
     if (dest.root === v.cur.root && dest.rel === dirOfRel(v.cur.rel)) continue;
-    const key = `${dest.root}\u0000${dest.rel}`;
-    let names = taken.get(key);
-    if (!names) {
-      const listing = await listDir(d.roots.resolve(dest).abs).catch(() => null);
-      taken.set(key, (names = new Set(listing?.allNames ?? [])));
-    }
-    const name = v.entry.name;
-    let candidate = name;
-    for (let i = 1; names.has(candidate.toLowerCase()); i++) candidate = `${baseOf(name)}_${i}${name.slice(baseOf(name).length)}`;
-    names.add(candidate.toLowerCase());
+    const candidate = freeName(await takenNames(taken, dest, d), v.entry.name);
     const to = { root: dest.root, rel: joinRel(dest.rel, candidate) };
     plan.ops.push({ op: 'move', step, file: { ...v.cur }, to });
     item(v, { before: `${v.cur.root}/${v.cur.rel}`, after: `${to.root}/${to.rel}` });

@@ -288,7 +288,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
       </section>
 
       <section className="section">
-        <span className="eyebrow">Video conversion</span>
+        <span className="eyebrow">Conversion</span>
         <div className="card stack">
           <p className="muted" style={{ margin: 0 }}>
             Defaults for Convert to HEVC (Convert page, batch bar and automation). Lower CRF = better quality and bigger files; slower presets give
@@ -362,6 +362,18 @@ function SettingsForm({ initial }: { initial: Settings }) {
               ))}
             </div>
             <span className="hint">Re-encoding an already efficient video only loses quality.</span>
+          </div>
+          <div className="field" style={{ maxWidth: 260 }}>
+            <label>HEIC to JPG quality (1–100)</label>
+            <input
+              className="input"
+              type="number"
+              min={1}
+              max={100}
+              value={s.convert.jpegQuality}
+              onChange={(e) => set('convert', { ...s.convert, jpegQuality: Math.min(100, Math.max(1, Math.trunc(Number(e.target.value) || 1))) })}
+            />
+            <span className="hint">Default {defaults.convert.jpegQuality}.</span>
           </div>
         </div>
       </section>

@@ -58,6 +58,8 @@ export const SettingsSchema = z.object({
       minBitrateMbps: z.number().min(0).default(10),
       /** Keep the original when the result isn't at least this much smaller. */
       minSavingPct: z.number().int().min(0).max(95).default(20),
+      /** JPEG quality for Convert HEIC to JPG. */
+      jpegQuality: z.number().int().min(1).max(100).default(90),
     })
     .prefault({}),
   /**

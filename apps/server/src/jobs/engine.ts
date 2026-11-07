@@ -16,6 +16,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { DB } from '../db/db.js';
 import { encodeHevc, hasX265 } from '../convert/ffmpeg.js';
+import { heifToJpeg } from '../convert/heif.js';
 import { copyTree, moveFile, setFileTimes } from '../fs/ops.js';
 import type { Ownership, Warn } from '../fs/ownership.js';
 import type { Roots } from '../fs/roots.js';
@@ -34,7 +35,7 @@ type UndoEntry =
   | { t: 'move'; from: FileRef; to: FileRef }
   | { t: 'utimes'; file: FileRef; atimeMs: number; mtimeMs: number }
   | { t: 'trash'; id: number }
-  /** A converted video replaced `file`; the original is trash item `trashId`. */
+  /** A converted file (video, or the JPG of a HEIC) replaced the original, which is trash item `trashId`. */
   | { t: 'replace'; file: FileRef; trashId: number }
   /** `file` is a copy made by the job: undo moves it to the trash. */
   | { t: 'copy'; file: FileRef }
@@ -405,6 +406,34 @@ export class JobEngine extends EventEmitter {
         }
         await this.own.apply(file.abs, warn);
         undo.push({ t: 'utimes', file: op.file, atimeMs: st.atimeMs, mtimeMs: st.mtimeMs });
+        return;
+      }
+      case 'heicToJpeg': {
+        const to = this.roots.resolve(op.to).abs;
+        if (await fs.stat(to).catch(() => null)) throw new Error(`${path.basename(to)} already exists`);
+        const st = await fs.stat(file.abs);
+        const tmp = path.join(path.dirname(file.abs), `.io-convert-${randomUUID()}.jpg`);
+        this.db.prepare('INSERT INTO convert_tmp (path) VALUES (?)').run(tmp);
+        try {
+          await heifToJpeg(file.abs, tmp, op.quality);
+          // The decoder already applied the HEIF rotation; a copied Orientation would rotate it twice.
+          await this.metadata.copyAllFrom(file.abs, tmp, { icc: true, exclude: ['Orientation'] });
+          await fs.utimes(tmp, st.atime, st.mtime);
+          await this.own.wrote(to, () => moveFile(tmp, to), warn);
+          let item;
+          try {
+            item = await this.trash.trash(op.file, warn);
+          } catch (e) {
+            await fs.rm(to, { force: true });
+            throw e;
+          }
+          undo.push({ t: 'replace', file: op.to, trashId: item.id });
+          this.indexer.invalidate(op.file);
+          this.indexer.invalidate(op.to);
+        } finally {
+          await fs.rm(tmp, { force: true });
+          this.db.prepare('DELETE FROM convert_tmp WHERE path = ?').run(tmp);
+        }
         return;
       }
       case 'trash': {

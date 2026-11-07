@@ -38,11 +38,13 @@ export function mimeOf(name: string): string {
   return MIME[extOf(name)] ?? 'application/octet-stream';
 }
 
-/** Formats the browser can't render natively; previews come from a server-side JPEG. */
-export function needsJpegPreview(name: string): boolean {
+export function isHeif(name: string): boolean {
   const ext = extOf(name);
   return ext === '.heic' || ext === '.heif';
 }
+
+/** Formats the browser can't render natively; previews come from a server-side JPEG. */
+export const needsJpegPreview = isHeif;
 
 export type RootName = 'media' | 'import' | 'trash';
 

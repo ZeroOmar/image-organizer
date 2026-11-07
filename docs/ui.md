@@ -75,7 +75,7 @@ Uses the same `Workspace`, with two of its panes swapped out: `sidePane` puts th
 
 ## Convert page (`src/pages/Convert.tsx`)
 
-Like the GPS page, it swaps two Workspace panes: `content` is a table of the folder's videos (thumbnail, length, resolution, codec, bitrate, size, Candidate/Already efficient/Low bitrate pill), filtered to **Candidates** by default, and `sidePane` is **Conversion** (candidate count and size, running conversions with % progress and **Cancel**, recent savings). Candidate rules come from `convertSkipReason()` in shared, the same function the planner uses. Rows click-select and right-click like grid tiles. **Select candidates** selects every candidate; **Convert to HEVC** opens `ConvertDialog` (quality CRF presets + slider, encoder preset), which Organize and Import use too.
+Like the GPS page, it swaps two Workspace panes: `content` is a table of the folder's videos (thumbnail, length, resolution, codec, bitrate, size, Candidate/Already efficient/Low bitrate pill), filtered to **Candidates** by default, and `sidePane` is **Conversion** (candidate count and size, running conversions with % progress and **Cancel**, recent savings). Candidate rules come from `convertSkipReason()` in shared, the same function the planner uses. Rows click-select and right-click like grid tiles. **Select candidates** selects every candidate; **Convert to HEVC** opens `ConvertDialog` (quality CRF presets + slider, encoder preset), which Organize and Import use too. Organize and Import also have **HEIC to JPG** (`HeicToJpegDialog`, a quality slider), enabled when the selection has a HEIC/HEIF.
 
 ## Duplicates page (`src/pages/Duplicates.tsx`)
 

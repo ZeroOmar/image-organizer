@@ -24,6 +24,7 @@ It automates a manual Adobe Bridge workflow: open a folder → check *Date Time 
 - **Manage folders**: right-click (or long-press) a folder to rename, move or copy it (also between Media and Import), move it to the trash (Shift: delete permanently), or change its permissions (chmod) and owner (chown), recursively. Every change has a dry run and, except permanent delete, Undo.
 - **Find duplicates**: a **Duplicates** page scans a folder for exact copies (photos and videos), near-identical copies (the same picture resized or recompressed, e.g. a WhatsApp copy of an original) and **similar scenes** (photos that look alike, taken at any time, matched by an on-device CLIP image model). It picks the best file of each group (largest, with capture date, timezone and GPS) and moves the rest to the trash, so Undo works.
 - **Convert videos**: shrink large phone videos by re-encoding them to **HEVC (H.265)** at the same resolution, typically 3–10× smaller. Dates, timezone, GPS, camera make/model and audio are kept. Videos that are already HEVC/AV1 or low bitrate are skipped, and the original goes to the trash, so Undo works. A dedicated **Convert** page lists codec, bitrate and size; it's also a batch action and an automation step. Encodes run on their own queue with live progress and Cancel.
+- **HEIC to JPG**: save HEIC/HEIF photos as JPG for apps and sites that can't open them, at full resolution and upright, with dates, timezone, GPS, camera details and the color profile kept. The original goes to the trash, so Undo works. Available as a batch action on Organize and Import and as an automation step; the JPEG quality is set in Settings.
 - **Automation**: saved rule pipelines that run on demand, on a **cron schedule**, or **when files arrive** in a watched folder, with a dry run.
 - **Safe by design**:
   - every change is shown as a **dry run** before it applies
@@ -338,7 +339,7 @@ image-organizer/
 │   │   │   ├── metadata/       # ExifTool wrapper + date/GPS tag builders
 │   │   │   ├── index/          # SQLite metadata cache, resolved dates, issues
 │   │   │   ├── jobs/           # Planner (dry run) + serial engine with undo
-│   │   │   ├── convert/        # ffmpeg HEVC encoder (video conversion)
+│   │   │   ├── convert/        # ffmpeg HEVC encoder (video conversion), HEIC → JPEG
 │   │   │   ├── dupes/          # Duplicate finder: SHA-256, dHash, CLIP (onnxruntime-web)
 │   │   │   ├── thumbs/         # sharp / ffmpeg / embedded-JPEG thumbnails
 │   │   │   ├── trash/          # /trash with restore + retention
@@ -380,7 +381,7 @@ docker run --rm ghcr.io/zeroomar/image-organizer:latest node -e \
 
 **"Current location" doesn't work in the GPS dialog**: the browser only allows geolocation over HTTPS (or `localhost`). Use the reverse proxy URL.
 
-**HEIC thumbnails are missing**: the server tries sharp, then ffmpeg, then the JPEG preview embedded in the file. A HEIC without an embedded preview that ffmpeg can't decode shows no thumbnail; its metadata can still be edited.
+**HEIC thumbnails are missing**: the server tries sharp, then ffmpeg, then the JPEG preview embedded in the file. Phone HEICs are tile grids, which need ffmpeg 7.1 or newer (the Docker image has it; for a local run, `brew install ffmpeg`). A HEIC that ffmpeg can't decode and that has no embedded preview shows no thumbnail; the error names the ffmpeg failure, and its metadata can still be edited.
 
 **Writing metadata failed with "Error reading OtherImageStart data in IFD0"** (fixed in 0.5.0): the file's EXIF points at image data that isn't in the file. The app now rebuilds the file's metadata (keeping every readable tag) and retries, and notes this on the job.
 

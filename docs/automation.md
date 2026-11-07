@@ -34,7 +34,8 @@ Steps are shared with the batch bar. `STEP_INFO` marks which ones the rule edito
 | `move` | `dest` | |
 | `moveByDate` | `pattern` e.g. `{YYYY}/{YYYY}-{MM}` | into `/media` |
 | `trash` | — | UI only |
-| `convert` | `crf?`, `preset?` | re-encode videos to HEVC; unset params use Settings → Video conversion; runs on the convert lane; originals go to the trash ([convert.md](convert.md)) |
+| `convert` | `crf?`, `preset?` | re-encode videos to HEVC; unset params use Settings → Conversion; runs on the convert lane; originals go to the trash ([convert.md](convert.md)) |
+| `heicToJpeg` | `quality?` | save HEIC/HEIF photos as `<name>.jpg` (taken names get `_1`…), all metadata kept; unset quality uses Settings → Conversion; other files are skipped with a warning; originals go to the trash ([convert.md](convert.md#heic-to-jpg)) |
 
 Steps run in order on a simulated file state, so later steps see earlier renames, moves and date writes in the dry run too.
 

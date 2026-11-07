@@ -1,15 +1,16 @@
-import type { EnrichedEntry, FileRef } from '@io/shared';
+import { isHeif, type EnrichedEntry, type FileRef } from '@io/shared';
 import { useState } from 'react';
 import { useConfig } from '../api/hooks';
 import { ConvertDialog } from '../organize/dialogs/ConvertDialog';
 import { CopyMetadataDialog } from '../organize/dialogs/CopyMetadataDialog';
 import { DatesDialog } from '../organize/dialogs/DatesDialog';
 import { GpsDialog } from '../organize/dialogs/GpsDialog';
+import { HeicToJpegDialog } from '../organize/dialogs/HeicToJpegDialog';
 import { RenameDialog } from '../organize/dialogs/RenameDialog';
 import { EditTagsDialog, MoveDialog, SyncDatesDialog, TrashDialog } from '../organize/dialogs/SimpleDialogs';
 import { actionButtons, Workspace, type BatchAction, type WorkspaceApi } from '../organize/Workspace';
 
-type DialogId = 'rename' | 'dates' | 'gps' | 'copy' | 'tags' | 'sync' | 'convert' | 'move' | 'trash';
+type DialogId = 'rename' | 'dates' | 'gps' | 'copy' | 'tags' | 'sync' | 'convert' | 'heicToJpeg' | 'move' | 'trash';
 
 export function OrganizePage() {
   const [dialog, setDialog] = useState<DialogId | null>(null);
@@ -28,6 +29,7 @@ export function OrganizePage() {
       a('tags', 'Edit tags'),
       a('sync', 'Sync file dates'),
       ...(convertAvailable ? [a('convert', 'Convert to HEVC', { disabled: !w.selected.some((e) => e.kind === 'video') })] : []),
+      a('heicToJpeg', 'HEIC to JPG', { disabled: !w.selected.some((e) => isHeif(e.name)) }),
       a('move', 'Move'),
       a('trash', 'Trash', { variant: 'danger' }),
     ];
@@ -77,6 +79,8 @@ function Dialogs({ id, w, onClose }: { id: DialogId; w: WorkspaceApi; onClose: (
       return <SyncDatesDialog selection={w.selection} onClose={onClose} />;
     case 'convert':
       return <ConvertDialog selection={w.selection} count={w.selected.filter((e) => e.kind === 'video').length} onClose={onClose} />;
+    case 'heicToJpeg':
+      return <HeicToJpegDialog selection={w.selection} count={w.selected.filter((e) => isHeif(e.name)).length} onClose={onClose} />;
     case 'move':
       return <MoveDialog selection={w.selection} root="media" current={w.folder} onClose={onClose} />;
     case 'trash':

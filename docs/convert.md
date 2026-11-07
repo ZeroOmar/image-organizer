@@ -45,3 +45,14 @@ Other ops in a convert-lane job (e.g. a rule "convert, then rename") also run th
 ## Docker
 
 The image's Alpine `ffmpeg` package includes libx265. Encoding is CPU-only and uses all cores; one file is encoded at a time. On a typical home server, 1080p at `medium` runs at about real time or slower; `fast`/`veryfast` are quicker, with somewhat larger files.
+
+## HEIC to JPG
+
+The `heicToJpeg` step (**HEIC to JPG** in the Organize and Import batch bars, and an automation step) saves HEIC/HEIF photos as JPEG for apps and sites that can't open HEIC. It is quick (about a second per photo), so it runs on the main lane like any other step.
+
+- **Decode** (`apps/server/src/convert/heif.ts`): ffmpeg, because sharp's prebuilt libheif only has the AV1 (AVIF) decoder. ffmpeg assembles iPhone tile grids at full resolution and applies the HEIF rotation (`irot`/`imir`), so the pixels come out upright. It pipes an 8-bit PNG to sharp, which encodes the JPEG at the step's `quality` (default: Settings → Conversion → HEIC to JPG quality, 90). Pixel values are not color-converted.
+- **Metadata**: `Metadata.copyAllFrom(heic, jpg, { icc: true, exclude: ['Orientation'] })` copies every tag plus the ICC profile (Display P3 on iPhones; `-all:all` alone skips it). EXIF `Orientation` is left out because the rotation is already applied to the pixels. The file's mtime is set to the original's.
+- **Name**: same base name with `.jpg` in the same folder; a taken name becomes `name_1.jpg`. Later steps in the same job (e.g. rename) apply to the JPG.
+- **Swap**: the JPG is written to a hidden `.io-convert-<uuid>.jpg` (listed in `convert_tmp`), moved into place, then the original is **trashed**. Undo entry `{ t: 'replace', file: <jpg>, trashId }`: undo trashes the JPG and restores the HEIC to its path.
+- Files that aren't HEIC/HEIF are skipped with a plan warning.
+

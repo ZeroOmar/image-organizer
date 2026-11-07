@@ -73,6 +73,11 @@ export const StepSchema = z.discriminatedUnion('type', [
     crf: z.number().int().min(0).max(51).optional(),
     preset: z.enum(CONVERT_PRESETS).optional(),
   }),
+  z.object({
+    type: z.literal('heicToJpeg'),
+    /** JPEG quality; unset = Settings → Conversion. */
+    quality: z.number().int().min(1).max(100).optional(),
+  }),
 ]);
 export type Step = z.infer<typeof StepSchema>;
 export type StepType = Step['type'];
@@ -93,6 +98,7 @@ export const STEP_INFO: Record<StepType, { label: string; description: string; a
   moveByDate: { label: 'Move into dated folders', description: 'Move into /media folders like {YYYY}/{MM}', automation: true },
   trash: { label: 'Trash', description: 'Move files to the trash', automation: false },
   convert: { label: 'Convert to HEVC', description: 'Re-encode videos to HEVC, keeping resolution and metadata; originals go to the trash', automation: true },
+  heicToJpeg: { label: 'Convert HEIC to JPG', description: 'Save HEIC/HEIF photos as JPG next to them, keeping all metadata; originals go to the trash', automation: true },
 };
 
 /** Steps that run on the convert lane (long CPU-bound encodes) instead of the main job queue. */

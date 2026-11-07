@@ -356,6 +356,25 @@ function StepParams({ step: s, onChange }: { step: Step; onChange: (s: Step) => 
           <span className="caption muted">Runs on its own queue; originals go to the trash.</span>
         </div>
       );
+    case 'heicToJpeg':
+      return (
+        <div className="row">
+          <label className="row" style={{ gap: 6 }}>
+            <span className="caption muted">Quality</span>
+            <input
+              className="input"
+              type="number"
+              min={1}
+              max={100}
+              style={{ width: 90 }}
+              placeholder="Settings"
+              value={s.quality ?? ''}
+              onChange={(e) => onChange({ ...s, quality: e.target.value === '' ? undefined : Math.min(100, Math.max(1, Math.trunc(Number(e.target.value) || 1))) })}
+            />
+          </label>
+          <span className="caption muted">Other files are skipped; originals go to the trash.</span>
+        </div>
+      );
     default:
       return null;
   }

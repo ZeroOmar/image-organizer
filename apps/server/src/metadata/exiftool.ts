@@ -150,9 +150,12 @@ export class Metadata {
    * Copy every writable tag from `source` (the original of a re-encoded video): QuickTime dates,
    * Keys (Apple GPS/make/model/creationdate), UserData (Android ©xyz GPS), ItemList, XMP.
    * ExifTool doesn't copy stream-describing tags (codec, dimensions, handlers), so the new encode stays intact.
+   * `icc` also copies the ICC profile (not part of -all:all); `exclude` skips tags, e.g. an Orientation
+   * already applied to the pixels.
    */
-  async copyAllFrom(source: string, target: string): Promise<void> {
-    await this.et.write(target, {}, { writeArgs: ['-overwrite_original', '-P', '-tagsFromFile', source, '-all:all', '-unsafe'] });
+  async copyAllFrom(source: string, target: string, opts: { icc?: boolean; exclude?: string[] } = {}): Promise<void> {
+    const extra = [...(opts.icc ? ['-ICC_Profile'] : []), ...(opts.exclude ?? []).map((t) => `--${t}`)];
+    await this.et.write(target, {}, { writeArgs: ['-overwrite_original', '-P', '-tagsFromFile', source, '-all:all', '-unsafe', ...extra] });
   }
 
   /** Largest embedded JPEG (PreviewImage, then ThumbnailImage). Throws when there is none. */

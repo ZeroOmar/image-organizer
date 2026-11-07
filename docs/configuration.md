@@ -56,7 +56,7 @@ See [../docker-compose.example.yml](../docker-compose.example.yml) (copy it to t
 
 ## Dynamic settings
 
-`SettingsSchema` (`packages/shared/src/settings.ts`), stored in SQLite and edited on the Settings page: date-source priority, rename templates/type labels/counter, extension map, issue highlighting, a trash retention override, and video conversion defaults (CRF, preset, skip rules; see [convert.md](convert.md)). Adding a field: add it to the schema with a default (`.prefault({})` for nested objects in zod 4), then add UI in `apps/web/src/pages/Settings.tsx`.
+`SettingsSchema` (`packages/shared/src/settings.ts`), stored in SQLite and edited on the Settings page: date-source priority, rename templates/type labels/counter, extension map, issue highlighting, a trash retention override, and conversion defaults (video CRF, preset, skip rules, HEIC to JPG quality; see [convert.md](convert.md)). Adding a field: add it to the schema with a default (`.prefault({})` for nested objects in zod 4), then add UI in `apps/web/src/pages/Settings.tsx`.
 
 ## Local runs
 

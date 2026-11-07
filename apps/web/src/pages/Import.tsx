@@ -1,4 +1,4 @@
-import { kindOf, type Step } from '@io/shared';
+import { isHeif, kindOf, type Step } from '@io/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { useConfig, useJobs } from '../api/hooks';
 import { ActionDialog } from '../components/ActionDialog';
 import { FolderPicker } from '../components/FolderPicker';
 import { ConvertDialog } from '../organize/dialogs/ConvertDialog';
+import { HeicToJpegDialog } from '../organize/dialogs/HeicToJpegDialog';
 import { MoveDialog, TrashDialog } from '../organize/dialogs/SimpleDialogs';
 import { actionButtons, Workspace, type BatchAction, type WorkspaceApi } from '../organize/Workspace';
 
@@ -25,7 +26,7 @@ export function ImportPage() {
   const config = useConfig().data;
   const maxMB = config?.maxUploadMB;
   const [uploads, setUploads] = useState<Upload[]>([]);
-  const [dialog, setDialog] = useState<'album' | 'move' | 'convert' | 'trash' | null>(null);
+  const [dialog, setDialog] = useState<'album' | 'move' | 'convert' | 'heicToJpeg' | 'trash' | null>(null);
   const [lastAlbum, setLastAlbum] = useState<{ jobId: string; rel: string } | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const folderRef = useRef('');
@@ -96,6 +97,7 @@ export function ImportPage() {
     ...(config?.convertAvailable
       ? [{ label: 'Convert to HEVC', run: () => setDialog('convert'), disabled: !w.selected.some((e) => e.kind === 'video') }]
       : []),
+    { label: 'HEIC to JPG', run: () => setDialog('heicToJpeg'), disabled: !w.selected.some((e) => isHeif(e.name)) },
     { label: 'Trash', run: () => setDialog('trash'), variant: 'danger' },
   ];
 
@@ -134,6 +136,9 @@ export function ImportPage() {
         {dialog === 'move' && <MoveDialog selection={w.selection} root="import" current={w.folder} onClose={() => setDialog(null)} />}
         {dialog === 'convert' && (
           <ConvertDialog selection={w.selection} count={w.selected.filter((e) => e.kind === 'video').length} onClose={() => setDialog(null)} />
+        )}
+        {dialog === 'heicToJpeg' && (
+          <HeicToJpegDialog selection={w.selection} count={w.selected.filter((e) => isHeif(e.name)).length} onClose={() => setDialog(null)} />
         )}
         {dialog === 'trash' && <TrashDialog selection={w.selection} count={n} onClose={() => setDialog(null)} />}
       </>

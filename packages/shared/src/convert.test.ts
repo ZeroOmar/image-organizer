@@ -15,7 +15,7 @@ describe('convert', () => {
   });
 
   it('has defaults, also for settings saved before the section existed', () => {
-    expect(defaultSettings().convert).toEqual({ crf: 24, preset: 'medium', skipCodecs: ['hevc', 'av1'], minBitrateMbps: 10, minSavingPct: 20 });
+    expect(defaultSettings().convert).toEqual({ crf: 24, preset: 'medium', skipCodecs: ['hevc', 'av1'], minBitrateMbps: 10, minSavingPct: 20, jpegQuality: 90 });
     expect(SettingsSchema.parse({ trash: { retentionDays: 30 } }).convert.crf).toBe(24);
   });
 

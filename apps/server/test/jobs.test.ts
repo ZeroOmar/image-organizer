@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FolderListing, JobInfo, JobRequest, PlanResult } from '@io/shared';
 import { createContext } from '../src/bootstrap.js';
@@ -265,6 +266,29 @@ describe('jobs', () => {
     expect(fs.existsSync(media('Family/20260901_183500_PIC.jpg'))).toBe(true);
   });
 
+  it('converts HEIC to JPG keeping metadata and mtime, skips other files, then undoes', async () => {
+    const heic = media('Family/IMG_2001.HEIC');
+    const before = exif(heic, 'DateTimeOriginal', 'GPSLatitude', 'Make', 'ImageWidth');
+    const mtime = fs.statSync(heic).mtimeMs;
+    const req: JobRequest = { selection: { folder: { root: 'media', rel: 'Family' } }, steps: [{ type: 'heicToJpeg', quality: 85 }] };
+    const plan = await api<PlanResult>('POST', '/api/jobs/plan', req);
+    expect(plan.items.map((i) => i.after)).toEqual(['IMG_2001.jpg (quality 85)']);
+    expect(plan.warnings).toEqual(['1 file(s) skipped: not HEIC/HEIF']);
+
+    const job = await runJob(req);
+    expect(job.errors).toEqual([]);
+    const jpg = media('Family/IMG_2001.jpg');
+    expect(fs.existsSync(heic)).toBe(false);
+    expect(fs.readFileSync(jpg).subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
+    expect(exif(jpg, 'DateTimeOriginal', 'GPSLatitude', 'Make', 'ImageWidth')).toEqual({ ...before, SourceFile: jpg });
+    expect(exif(jpg, 'Orientation').Orientation).toBeUndefined();
+    expect(Math.trunc(fs.statSync(jpg).mtimeMs)).toBe(Math.trunc(mtime));
+
+    await waitJob((await api<JobInfo>('POST', `/api/jobs/${job.id}/undo`)).id);
+    expect(fs.existsSync(heic)).toBe(true);
+    expect(fs.existsSync(jpg)).toBe(false);
+  });
+
   it('imports into an album with dates + rename', async () => {
     await api('POST', '/api/folders', { root: 'media', rel: '', name: 'Album' });
     const job = await runJob({
@@ -284,6 +308,31 @@ describe('jobs', () => {
       expect(res.statusCode, rel).toBe(200);
       expect(res.headers['content-type']).toBe('image/jpeg');
     }
+  });
+
+  // Phone HEICs are tile grids; ffmpeg rejects -vf on the filtergraph it builds for them. sips tiles large images.
+  const hasSips = (() => {
+    try {
+      execFileSync('which', ['sips']);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  it.skipIf(!hasSips)('thumbnails and previews a tiled, rotated HEIC upright', async () => {
+    fs.mkdirSync(media('Grid'));
+    const src = media('Grid/src.jpg');
+    execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1600x1200', '-frames:v', '1', src]);
+    execFileSync('sips', ['-s', 'format', 'heic', src, '--out', media('Grid/IMG_3001.HEIC')]);
+    fs.rmSync(src);
+    execFileSync('exiftool', ['-q', '-overwrite_original', '-Rotation=90', media('Grid/IMG_3001.HEIC')]);
+    for (const url of ['/api/thumb?root=media&rel=Grid/IMG_3001.HEIC&size=128', '/api/file?root=media&rel=Grid/IMG_3001.HEIC']) {
+      const res = await app.inject({ method: 'GET', url, headers: { cookie } });
+      expect(res.statusCode, `${url} ${res.body.slice(0, 200)}`).toBe(200);
+      const { width, height } = await sharp(res.rawPayload).metadata();
+      expect(height, url).toBeGreaterThan(width!);
+    }
+    fs.rmSync(media('Grid'), { recursive: true });
   });
 
   it('streams byte ranges', async () => {
