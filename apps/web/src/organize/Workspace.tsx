@@ -1,5 +1,5 @@
 import type { EnrichedEntry, FileRef, FolderOp, RootName } from '@io/shared';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
 import { useSearchParams } from 'react-router-dom';
 import { runJobAndWait, useFolder, useSettings, waitForJob } from '../api/hooks';
@@ -128,7 +128,39 @@ export function Workspace({
   statusTools?: ReactNode;
 }) {
   const [params, setParams] = useSearchParams();
-  const folder = params.get('path') ?? '';
+  // The open folder lives in ?path=. Remember it per root so switching pages (Organize ↔ GPS ↔ Convert…)
+  // comes back to the same folder: a visit without ?path= restores the last one once, on mount.
+  const folderKey = `io.${root}.folder`;
+  const [restore] = useState(() => {
+    if (params.has('path')) return '';
+    try {
+      return LS?.getItem(folderKey) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const restoring = useRef(!!restore);
+  const folder = params.get('path') ?? (restoring.current ? restore : '');
+  useEffect(() => {
+    if (!restoring.current) return;
+    restoring.current = false;
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        if (!next.has('path')) next.set('path', restore);
+        return next;
+      },
+      { replace: true },
+    );
+  }, [restore, setParams]);
+  useEffect(() => {
+    try {
+      if (folder) LS?.setItem(folderKey, folder);
+      else LS?.removeItem(folderKey);
+    } catch {
+      /* storage unavailable */
+    }
+  }, [folderKey, folder]);
   const [recursive, setRecursive] = useStored(`io.${root}.recursive`, false);
   const [size, setSize] = useStored(`io.thumbSize`, 160);
   const [sort, setSort] = useStored<{ key: SortKey; desc: boolean }>(`io.sort`, { key: 'date', desc: false });

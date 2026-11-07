@@ -38,7 +38,7 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 ```
 
 - Every split is a `Group`/`Panel`/`Separator`; layouts persist with `useDefaultLayout({id, storage: localStorage})` per root.
-- The current folder lives in the URL (`?path=`). Selection: click, Cmd/Ctrl-click, Shift-click, Cmd+A, Esc, arrow keys, and "Select all" / "Clear" in the status bar.
+- The current folder lives in the URL (`?path=`) and is remembered per root in localStorage (`io.<root>.folder`): opening any Workspace page without `?path=` returns to the last folder. Selection: click, Cmd/Ctrl-click, Shift-click, Cmd+A, Esc, arrow keys, and "Select all" / "Clear" in the status bar.
 - Touch (tablets): a tap toggles a tile in the selection (like Cmd-click), and a tap on empty space doesn't clear it. A long-press opens the context menu.
 - Context menu (`components/ContextMenu.tsx`): right-click or long-press a tile. It lists the page's batch actions, then Select all, Select range to here and Clear selection. A tile outside the selection replaces it (mouse) or joins it (touch). Pages pass `actions(api)` (a `BatchAction[]`) to `Workspace` and render the BatchBar buttons from the same list with `actionButtons()`, so the bar and the menu stay in sync.
 - Preview (`PreviewPane.tsx`): the focused file, or with several selected a fanned stack of up to 5 thumbnails (focused on top, green border) and the count. Cmd/Ctrl-click (or a tap) that deselects a file moves focus to the last remaining selected file, so Preview and Metadata never show a file that left the selection.
