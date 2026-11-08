@@ -1,6 +1,7 @@
 import { formatDisplay } from '@io/shared';
 import { useEffect, useRef, useState } from 'react';
 import { thumbUrl } from '../api/client';
+import { SelectCheck } from '../organize/SelectCheck';
 import type { WorkspaceApi } from '../organize/Workspace';
 
 /** dataTransfer type for dragging a list row onto the map. */
@@ -12,7 +13,6 @@ type Show = 'all' | 'none' | 'gps';
 export function FileList({ api }: { api: WorkspaceApi }) {
   const [show, setShow] = useState<Show>('all');
   const list = useRef<HTMLDivElement>(null);
-  const pointer = useRef('mouse');
   const withGps = api.visible.filter((e) => e.meta.gps).length;
   const counts: Record<Show, number> = { all: api.visible.length, gps: withGps, none: api.visible.length - withGps };
   const rows = api.visible.filter((e) => show === 'all' || (show === 'gps') === !!e.meta.gps);
@@ -40,7 +40,7 @@ export function FileList({ api }: { api: WorkspaceApi }) {
           ))}
         </div>
       </div>
-      <div ref={list} onPointerDown={(e) => (pointer.current = e.pointerType)}>
+      <div ref={list}>
         {rows.length === 0 && <div className="caption muted" style={{ padding: 12 }}>No files.</div>}
         {rows.map((e) => (
           <div
@@ -53,13 +53,14 @@ export function FileList({ api }: { api: WorkspaceApi }) {
               ev.dataTransfer.setData('text/plain', e.name);
               ev.dataTransfer.effectAllowed = 'copy';
             }}
-            onClick={(ev) => api.pick(e.rel, { shift: ev.shiftKey, meta: ev.metaKey || ev.ctrlKey, touch: pointer.current === 'touch' })}
+            onClick={(ev) => api.pick(e.rel, { shift: ev.shiftKey, meta: ev.metaKey || ev.ctrlKey })}
             onContextMenu={(ev) => {
               ev.preventDefault();
-              api.openMenu(ev.clientX, ev.clientY, e.rel, pointer.current === 'touch');
+              api.openMenu(ev.clientX, ev.clientY, e.rel);
             }}
             title={e.meta.gps ? `${e.meta.gps.lat.toFixed(5)}, ${e.meta.gps.lon.toFixed(5)}` : 'No GPS: select it, choose Place and click the map, or drag it onto the map'}
           >
+            <SelectCheck rel={e.rel} checked={api.selectedRels.has(e.rel)} pick={api.pick} />
             <img src={thumbUrl(e, 320)} alt="" loading="lazy" draggable={false} />
             <div className="file-row-text">
               <span className="file-row-name">{e.name}</span>

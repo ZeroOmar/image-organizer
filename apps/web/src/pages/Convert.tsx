@@ -14,6 +14,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { thumbUrl } from '../api/client';
 import { cancelJob, useConfig, useJobs, useSettings } from '../api/hooks';
 import { ConvertDialog } from '../organize/dialogs/ConvertDialog';
+import { SelectCheck } from '../organize/SelectCheck';
 import { actionButtons, Workspace, type BatchAction, type WorkspaceApi } from '../organize/Workspace';
 
 const SKIP_TEXT = { codec: 'Already efficient', bitrate: 'Low bitrate' } as const;
@@ -87,7 +88,6 @@ export function ConvertPage() {
 /** The center pane: the folder's videos with codec, bitrate and size. Rows click-select like the grid. */
 function VideoTable({ api, settings: c }: { api: WorkspaceApi; settings: Settings['convert'] | undefined }) {
   const [onlyCandidates, setOnlyCandidates] = useState(true);
-  const pointer = useRef('mouse');
   const wrap = useRef<HTMLDivElement>(null);
   const videos = api.visible.filter((e) => e.kind === 'video');
   const rows = onlyCandidates ? videos.filter((e) => isCandidate(e, c)) : videos;
@@ -98,7 +98,7 @@ function VideoTable({ api, settings: c }: { api: WorkspaceApi; settings: Setting
   }, [focusedRel]);
 
   return (
-    <div className="convert-table" ref={wrap} onPointerDown={(e) => (pointer.current = e.pointerType)}>
+    <div className="convert-table" ref={wrap}>
       <div className="file-list-head row">
         <div className="seg" role="tablist">
           <button role="tab" className={onlyCandidates ? 'active' : ''} onClick={() => setOnlyCandidates(true)}>
@@ -117,6 +117,7 @@ function VideoTable({ api, settings: c }: { api: WorkspaceApi; settings: Setting
         <table className="table">
           <thead>
             <tr>
+              <th className="select-col" />
               <th>Video</th>
               <th>Length</th>
               <th>Resolution</th>
@@ -136,12 +137,15 @@ function VideoTable({ api, settings: c }: { api: WorkspaceApi; settings: Setting
                   key={e.rel}
                   data-rel={e.rel}
                   className={`${api.selectedRels.has(e.rel) ? 'selected' : ''}${focusedRel === e.rel ? ' focused' : ''}`}
-                  onClick={(ev) => api.pick(e.rel, { shift: ev.shiftKey, meta: ev.metaKey || ev.ctrlKey, touch: pointer.current === 'touch' })}
+                  onClick={(ev) => api.pick(e.rel, { shift: ev.shiftKey, meta: ev.metaKey || ev.ctrlKey })}
                   onContextMenu={(ev) => {
                     ev.preventDefault();
-                    api.openMenu(ev.clientX, ev.clientY, e.rel, pointer.current === 'touch');
+                    api.openMenu(ev.clientX, ev.clientY, e.rel);
                   }}
                 >
+                  <td className="select-col">
+                    <SelectCheck rel={e.rel} checked={api.selectedRels.has(e.rel)} pick={api.pick} />
+                  </td>
                   <td>
                     <span className="convert-name">
                       <img src={thumbUrl(e, 320)} alt="" loading="lazy" draggable={false} />

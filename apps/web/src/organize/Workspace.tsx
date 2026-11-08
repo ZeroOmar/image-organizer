@@ -27,10 +27,10 @@ export interface WorkspaceApi {
   selectedRels: Selection;
   setSelection: (s: Selection) => void;
   focusRel: (rel: string | null) => void;
-  /** Click-select a file like the grid does (modifiers, touch toggle); for custom panes. */
+  /** Click-select a file like the grid does (modifiers, checkbox toggle); for custom panes. */
   pick: (rel: string, m?: PickModifiers) => void;
   /** Open the right-click / long-press menu for a file (or empty space) at a viewport point; for custom panes. */
-  openMenu: (x: number, y: number, rel: string | null, touch?: boolean) => void;
+  openMenu: (x: number, y: number, rel: string | null) => void;
 }
 
 /** A batch action, rendered both as a BatchBar button (via `actionButtons`) and as a context-menu item. */
@@ -225,13 +225,12 @@ export function Workspace({
     ];
   };
 
-  // Right-click / long-press (grid tiles and custom panes): a file outside the selection replaces it (mouse, like Finder)
-  // or joins it (touch, so a selection built by tapping survives).
-  const openMenu = (x: number, y: number, rel: string | null, touch = false) => {
+  // Right-click / long-press (grid tiles and custom panes): a file outside the selection replaces it, like Finder.
+  const openMenu = (x: number, y: number, rel: string | null) => {
     if (!actions) return;
     let base = selection;
     if (rel && !selection.has(rel)) {
-      base = touch ? new Set([...selection, rel]) : new Set([rel]);
+      base = new Set([rel]);
       setSelection(base);
     }
     if (rel) setFocusedRel(rel);

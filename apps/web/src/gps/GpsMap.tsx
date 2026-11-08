@@ -179,7 +179,6 @@ export function GpsMap({ api, onMap }: { api: WorkspaceApi; onMap?: (map: L.Map 
   const [toward, setToward] = useState<'center' | 'average'>('average');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pointer = useRef('mouse');
 
   const located = useMemo(() => api.visible.filter((e): e is EnrichedEntry & { meta: { gps: LatLon } } => !!e.meta.gps), [api.visible]);
   const points = useMemo(() => located.map((e) => e.meta.gps), [located]);
@@ -211,7 +210,7 @@ export function GpsMap({ api, onMap }: { api: WorkspaceApi; onMap?: (map: L.Map 
           click: (ev) => {
             L.DomEvent.stopPropagation(ev);
             const o = ev.originalEvent;
-            api.pick(e.rel, { shift: o.shiftKey, meta: o.metaKey || o.ctrlKey, touch: pointer.current === 'touch' });
+            api.pick(e.rel, { shift: o.shiftKey, meta: o.metaKey || o.ctrlKey });
           },
         }}
       >
@@ -316,7 +315,7 @@ export function GpsMap({ api, onMap }: { api: WorkspaceApi; onMap?: (map: L.Map 
 
   if (!config) return <div className="gps-map-area" />;
   return (
-    <div className={`gps-map-area mode-${mode}`} onDragOver={onDragOver} onDrop={onDrop} onPointerDownCapture={(e) => (pointer.current = e.pointerType)}>
+    <div className={`gps-map-area mode-${mode}`} onDragOver={onDragOver} onDrop={onDrop}>
       <MapContainer ref={setMap} center={[20, 0]} zoom={2} zoomControl={false} style={{ height: '100%' }}>
         {/* OSM blocks tile requests without a Referer; pin the policy so a proxy's `Referrer-Policy: no-referrer` can't strip it. */}
         <TileLayer url={config.mapTileUrl} attribution={config.mapAttribution} referrerPolicy="strict-origin-when-cross-origin" />

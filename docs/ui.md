@@ -39,9 +39,10 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 
 - Every split is a `Group`/`Panel`/`Separator`; layouts persist with `useDefaultLayout({id, storage: localStorage})` per root.
 - The current folder lives in the URL (`?path=`) and is remembered per root in localStorage (`io.<root>.folder`): opening any Workspace page without `?path=` returns to the last folder. Selection: click, Cmd/Ctrl-click, Shift-click, Cmd+A, Esc, arrow keys, and "Select all" / "Clear" in the status bar.
-- Touch (tablets): a tap toggles a tile in the selection (like Cmd-click), and a tap on empty space doesn't clear it. A long-press opens the context menu.
-- Context menu (`components/ContextMenu.tsx`): right-click or long-press a tile. It lists the page's batch actions, then Select all, Select range to here and Clear selection. A tile outside the selection replaces it (mouse) or joins it (touch). Pages pass `actions(api)` (a `BatchAction[]`) to `Workspace` and render the BatchBar buttons from the same list with `actionButtons()`, so the bar and the menu stay in sync.
-- Preview (`PreviewPane.tsx`): the focused file, or with several selected a fanned stack of up to 5 thumbnails (focused on top, green border) and the count. Cmd/Ctrl-click (or a tap) that deselects a file moves focus to the last remaining selected file, so Preview and Metadata never show a file that left the selection.
+- Selection checkbox (`organize/SelectCheck.tsx`): every grid tile and list row (GPS Files list, Convert table) has one. It toggles the file like Cmd/Ctrl-click (Shift-click on it adds the range). On touch the tile checkbox is always shown; with a mouse it appears on hover and on selected tiles.
+- Touch (tablets): a tap selects only that file, like a click, so a stray tap can't add files to a batch edit. Multi-select with the checkboxes. A tap on empty space doesn't clear the selection. A long-press opens the context menu.
+- Context menu (`components/ContextMenu.tsx`): right-click or long-press a tile. It lists the page's batch actions, then Select all, Select range to here and Clear selection. A tile outside the selection replaces it, like Finder. Pages pass `actions(api)` (a `BatchAction[]`) to `Workspace` and render the BatchBar buttons from the same list with `actionButtons()`, so the bar and the menu stay in sync.
+- Preview (`PreviewPane.tsx`): the focused file, or with several selected a fanned stack of up to 5 thumbnails (focused on top, green border) and the count. Cmd/Ctrl-click (or a checkbox) that deselects a file moves focus to the last remaining selected file, so Preview and Metadata never show a file that left the selection.
 - Folder menu: right-click or long-press a folder in the Folders pane (every Workspace page, not the trash).
   - Items: **Rename**, **Move to…**, **Copy to…** (destination in Media or Import), **Permissions (chmod)**, **Owner (chown)** and **Move to trash**.
   - Holding Shift turns the last item into **Delete permanently**; the trash dialog also has a checkbox for it.
@@ -63,7 +64,7 @@ Pass `onEditGps` to `Workspace` to enable it (Organize does; Import stays read-o
 
 ## GPS page (`src/pages/Gps.tsx`, `src/gps/`)
 
-Uses the same `Workspace`, with two of its panes swapped out: `sidePane` puts the **Files** list (`FileList.tsx`) where the Filter pane is, and `content` puts the map (`GpsMap.tsx`) where the grid is. The pages share selection through `WorkspaceApi.pick/setSelection/focusRel`, which use `organize/useSelectClick.ts`, the same click rules the grid uses, touch toggling included. Right-clicking a row opens the same context menu as a grid tile, through `WorkspaceApi.openMenu`. A **Media | Import** switch in the Folders pane header (`folderTools`) sets `?root=`.
+Uses the same `Workspace`, with two of its panes swapped out: `sidePane` puts the **Files** list (`FileList.tsx`) where the Filter pane is, and `content` puts the map (`GpsMap.tsx`) where the grid is. The pages share selection through `WorkspaceApi.pick/setSelection/focusRel`, which use `organize/useSelectClick.ts`, the same click rules the grid uses, checkbox toggling included. Right-clicking a row opens the same context menu as a grid tile, through `WorkspaceApi.openMenu`. A **Media | Import** switch in the Folders pane header (`folderTools`) sets `?root=`.
 
 - **Files**: All / No GPS / With GPS. Rows click-select, scroll into view when their marker is picked, and can be dragged onto the map.
 - **Map**: one marker per geotagged file, zoomed to fit once per folder (and on **Fit**). Marker colors come from `tokens.css`. Clicking a marker selects the file, and the list and Preview follow. Selected and focused markers sit in their own Leaflet panes above the rest (with a pulsing halo), so they stay visible inside a dense cluster. Whenever the selection or focus changes, the map goes to the highlighted file (zooming in to street level, but never out when already closer) or fits all highlighted files. The status bar's Zoom slider (in place of the thumbnail Size slider) follows and sets the map zoom.
@@ -92,7 +93,7 @@ Releasing the slider after a scan regroups the result (`GET /api/dupes/scan?thre
 The content pane has one `.dupe-group` card per group:
 - Kept tiles are green-tinted; the auto-picked one has a **Best** pill.
 - Clicking a thumbnail focuses the file in Preview/Metadata.
-- **Keep all** spares a group.
+- **Keep all** spares a group, and **Trash N unkept** opens `TrashDialog` for just that group's unkept files.
 
 The batch bar has **Auto-pick best** and **Move unkept to trash** (`TrashDialog`). After the job, `invalidateFiles()` refetches `dupes`, and trashed files drop out of the groups.
 

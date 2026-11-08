@@ -6,13 +6,14 @@ export interface PickModifiers {
   shift?: boolean;
   /** Cmd (macOS) or Ctrl. */
   meta?: boolean;
-  /** A touch tap: toggles like Cmd/Ctrl-click so a tablet can multi-select. */
-  touch?: boolean;
+  /** Toggle this file in the selection (the tile/row checkbox; same as Cmd/Ctrl-click). */
+  toggle?: boolean;
 }
 
 /**
  * Finder/Bridge-style click selection over an ordered list of rels: click selects one, Cmd/Ctrl-click toggles,
- * Shift-click selects the range from the last clicked item (adding to the selection with Cmd/Ctrl), touch toggles.
+ * Shift-click selects the range from the last clicked item (adding to the selection with Cmd/Ctrl).
+ * A touch tap is a plain click (selects only that file); multi-select on touch goes through the checkboxes (`toggle`).
  */
 export function useSelectClick({
   order,
@@ -40,8 +41,8 @@ export function useSelectClick({
   const pick = useCallback(
     (rel: string, m: PickModifiers = {}) => {
       if (m.shift && anchor.current && order.includes(anchor.current)) {
-        selectRange(rel, m.meta ? selection : new Set());
-      } else if (m.touch || m.meta) {
+        selectRange(rel, m.meta || m.toggle ? selection : new Set());
+      } else if (m.toggle || m.meta) {
         const next = new Set(selection);
         if (next.has(rel)) next.delete(rel);
         else next.add(rel);

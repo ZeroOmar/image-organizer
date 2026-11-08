@@ -39,7 +39,7 @@ Files are compared field by field, and the first field that differs decides:
 
 So an original beats its social-media copy. Among byte-identical copies, the one with the clean name in the shallower folder is kept.
 
-In the UI, each tile has a **Keep** checkbox. One file per group always stays. **Keep all** spares a whole group, and **Auto-pick best** resets the choices. **Move unkept to trash** opens the usual trash dialog (dry run, then apply).
+In the UI, each tile has a **Keep** checkbox. One file per group always stays. **Keep all** spares a whole group, and **Auto-pick best** resets the choices. **Move unkept to trash** (bottom bar) opens the usual trash dialog (dry run, then apply) for every group at once; each group's **Trash N unkept** button does the same for just that group, so you can work through the results one group at a time. Trashed files drop out of their group, and a group with one file left disappears.
 
 ## Scanner (`apps/server/src/dupes/scanner.ts`)
 

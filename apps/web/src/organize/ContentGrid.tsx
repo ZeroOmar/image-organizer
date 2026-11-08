@@ -2,6 +2,7 @@ import { formatDisplay, type EnrichedEntry } from '@io/shared';
 import { memo, useCallback, useEffect, useRef, type DragEvent, type MouseEvent, type PointerEvent } from 'react';
 import { thumbUrl } from '../api/client';
 import { LONG_PRESS_MS, LONG_PRESS_SLOP } from '../components/ContextMenu';
+import { SelectCheck } from './SelectCheck';
 import type { PickModifiers, Selection } from './useSelectClick';
 
 
@@ -35,11 +36,11 @@ export function ContentGrid({
   highlight: boolean;
   onDropFiles?: (files: File[]) => void;
   /** Open the context menu for a tile (or empty space); the workspace applies the selection rules. */
-  onMenu?: (x: number, y: number, rel: string | null, touch: boolean) => void;
+  onMenu?: (x: number, y: number, rel: string | null) => void;
   empty: string;
 }) {
   const area = useRef<HTMLDivElement>(null);
-  // Pointer type of the last press: touch taps toggle tiles (like Cmd/Ctrl-click) so a tablet can multi-select.
+  // Pointer type of the last press (touch long-press opens the menu; touch never clears on empty space).
   const pointer = useRef<string>('mouse');
   const press = useRef<{ timer: number; x: number; y: number } | null>(null);
   const longPressed = useRef(false);
@@ -50,7 +51,7 @@ export function ContentGrid({
         longPressed.current = false;
         return;
       }
-      pick(rel, { shift: e.shiftKey, meta: e.metaKey || e.ctrlKey, touch: pointer.current === 'touch' });
+      pick(rel, { shift: e.shiftKey, meta: e.metaKey || e.ctrlKey });
     },
     [pick],
   );
@@ -80,7 +81,7 @@ export function ContentGrid({
       timer: window.setTimeout(() => {
         press.current = null;
         longPressed.current = true;
-        onMenuRef.current?.(x, y, rel, true);
+        onMenuRef.current?.(x, y, rel);
       }, LONG_PRESS_MS),
     };
   };
@@ -125,7 +126,7 @@ export function ContentGrid({
       ref={area}
       tabIndex={0}
       onClick={(e) => {
-        // On touch, a tap between tiles would too easily wipe a hand-built selection; use "Clear" instead.
+        // On touch, a tap between tiles would too easily wipe a checkbox-built selection; use "Clear" instead.
         if (e.target === e.currentTarget && pointer.current !== 'touch') onSelection(new Set());
       }}
       onPointerDown={onPointerDown}
@@ -137,7 +138,7 @@ export function ContentGrid({
         e.preventDefault();
         // Touch long-press is handled by our own timer (iOS never fires contextmenu, Android does).
         if (pointer.current === 'touch') return;
-        onMenu(e.clientX, e.clientY, tileAt(e.target), false);
+        onMenu(e.clientX, e.clientY, tileAt(e.target));
       }}
       onDragOver={(e) => drag(e, true)}
       onDragLeave={(e) => drag(e, false)}
@@ -151,7 +152,7 @@ export function ContentGrid({
       ) : (
         <div className="tiles" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${size}px, 1fr))` }}>
           {entries.map((e) => (
-            <Tile key={e.rel} entry={e} selected={selection.has(e.rel)} size={size} highlight={highlight} onClick={click} />
+            <Tile key={e.rel} entry={e} selected={selection.has(e.rel)} size={size} highlight={highlight} onClick={click} pick={pick} />
           ))}
         </div>
       )}
@@ -165,12 +166,14 @@ const Tile = memo(function Tile({
   size,
   highlight,
   onClick,
+  pick,
 }: {
   entry: EnrichedEntry;
   selected: boolean;
   size: number;
   highlight: boolean;
   onClick: (ev: MouseEvent, rel: string) => void;
+  pick: (rel: string, m?: PickModifiers) => void;
 }) {
   const cls = issueClass(e, highlight);
   const thumbSize = size <= 160 ? 320 : 640;
@@ -183,8 +186,9 @@ const Tile = memo(function Tile({
     >
       <div className="tile-thumb">
         <img src={thumbUrl(e, thumbSize)} loading="lazy" decoding="async" alt="" draggable={false} />
+        {e.kind === 'video' && <span className="tile-kind">VIDEO</span>}
       </div>
-      {e.kind === 'video' && <span className="tile-kind">VIDEO</span>}
+      <SelectCheck rel={e.rel} checked={selected} pick={pick} className="tile-check" />
       {highlight && e.issues.length > 0 && <span className={`tile-badge ${cls.badge}`}>{e.issues.length}</span>}
       <div className="tile-name">{e.name}</div>
       <div className="tile-meta">{e.resolved ? `${formatDisplay(e.resolved.local)} ${e.resolved.offset}` : 'No date'}</div>

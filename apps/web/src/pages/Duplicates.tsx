@@ -254,9 +254,10 @@ function GroupList({
   keep: KeepOverrides;
   setKeep: (rels: string[], value: boolean) => void;
 }) {
-  const pointer = useRef('mouse');
   const wrap = useRef<HTMLDivElement>(null);
   const focusedRel = api.focused?.rel;
+  // One group's unkept files, while its trash dialog is open.
+  const [trashFiles, setTrashFiles] = useState<DupeGroup['files'] | null>(null);
 
   useEffect(() => {
     if (focusedRel) wrap.current?.querySelector(`[data-rel="${CSS.escape(focusedRel)}"]`)?.scrollIntoView({ block: 'nearest' });
@@ -269,9 +270,10 @@ function GroupList({
   if (!groups.length) return <div className="empty">No duplicates found in {scan.folder.rel || scan.folder.root}.</div>;
 
   return (
-    <div className="dupe-list" ref={wrap} onPointerDown={(e) => (pointer.current = e.pointerType)}>
+    <div className="dupe-list" ref={wrap}>
       {groups.map((g) => {
         const kept = g.files.filter((f) => isKept(keep, g, f.rel));
+        const unkept = g.files.filter((f) => !isKept(keep, g, f.rel));
         return (
           <section key={g.files[0].rel} className="dupe-group">
             <div className="dupe-group-head">
@@ -281,6 +283,14 @@ function GroupList({
               <span className="caption muted grow">{formatBytes(g.files.reduce((s, f) => s + f.size, 0))}</span>
               <button className="link-btn caption" disabled={kept.length === g.files.length} onClick={() => setKeep(g.files.map((f) => f.rel), true)}>
                 Keep all
+              </button>
+              <button
+                className="btn btn-sm btn-danger"
+                disabled={!unkept.length}
+                title={unkept.length ? `${formatBytes(unkept.reduce((s, f) => s + f.size, 0))} from this group` : 'Every file in this group is kept'}
+                onClick={() => setTrashFiles(unkept)}
+              >
+                Trash {unkept.length} unkept
               </button>
             </div>
             <div className="dupe-tiles">
@@ -292,7 +302,7 @@ function GroupList({
                     key={f.rel}
                     data-rel={f.rel}
                     className={`dupe-tile${on ? ' kept' : ''}${focusedRel === f.rel ? ' focused' : ''}`}
-                    onClick={() => api.pick(f.rel, { touch: pointer.current === 'touch' })}
+                    onClick={() => api.pick(f.rel)}
                   >
                     <div className="tile-thumb">
                       <img src={thumbUrl(f, 320)} alt="" loading="lazy" draggable={false} />
@@ -330,6 +340,9 @@ function GroupList({
           </section>
         );
       })}
+      {trashFiles && (
+        <TrashDialog selection={{ files: trashFiles.map((f) => ({ root: f.root, rel: f.rel })) }} count={trashFiles.length} onClose={() => setTrashFiles(null)} />
+      )}
     </div>
   );
 }
