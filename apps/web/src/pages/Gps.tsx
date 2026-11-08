@@ -65,7 +65,7 @@ export function GpsPage() {
       folderTools={rootSwitch}
       batchBar={bar}
       actions={actions}
-      sidePane={{ label: 'Files', render: (w) => <FileList api={w} /> }}
+      sidePane={{ label: 'Files', render: (w) => <FileList api={w} />, selectionTools: true }}
       content={(w) => <GpsMap api={w} onMap={setMap} />}
       statusTools={<ZoomSlider map={map} />}
       emptyText="This folder has no photos or videos."

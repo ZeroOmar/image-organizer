@@ -161,6 +161,24 @@ a:hover {
   padding: 4px 10px;
   font-size: 13px;
 }
+/* Select all / Clear: next to Sort in the content toolbar (GPS: in the Files pane header). */
+.select-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--s-xxs);
+}
+.select-tools .btn {
+  min-height: 32px;
+  padding: 4px 12px;
+}
+@media (pointer: coarse) {
+  .select-tools .btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+}
 .icon-btn {
   min-height: 28px;
   min-width: 28px;

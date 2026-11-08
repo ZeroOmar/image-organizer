@@ -122,8 +122,8 @@ export function Workspace({
   onEditGps?: (targets: FileRef[], focused: EnrichedEntry) => void;
   /** Replaces the thumbnail grid in the center pane. */
   content?: (api: WorkspaceApi) => ReactNode;
-  /** Replaces the Filter pane under the folder tree. */
-  sidePane?: { label: string; render: (api: WorkspaceApi) => ReactNode };
+  /** Replaces the Filter pane under the folder tree. `selectionTools` moves Select all / Clear into its header. */
+  sidePane?: { label: string; render: (api: WorkspaceApi) => ReactNode; selectionTools?: boolean };
   /** Replaces the thumbnail Size slider at the right of the status bar. */
   statusTools?: ReactNode;
 }) {
@@ -298,6 +298,22 @@ export function Workspace({
   const r = useDefaultLayout({ id: `io-${root}-right`, storage: localStorage });
   const crumbs = folder ? folder.split('/') : [];
 
+  const selectionInSidePane = !!sidePane?.selectionTools;
+  const selectionTools = (
+    <div className="select-tools">
+      <button
+        className="btn btn-ghost btn-sm"
+        disabled={visible.length === 0 || selected.length === visible.length}
+        onClick={() => setSelection(new Set(visible.map((e) => e.rel)))}
+      >
+        Select all
+      </button>
+      <button className="btn btn-ghost btn-sm" disabled={selection.size === 0} onClick={() => setSelection(new Set())}>
+        Clear
+      </button>
+    </div>
+  );
+
   return (
     <div className="workspace">
       <Group orientation="horizontal" id={`io-${root}-h`} defaultLayout={h.defaultLayout} onLayoutChanged={h.onLayoutChanged}>
@@ -325,6 +341,7 @@ export function Workspace({
               <div className="pane">
                 <div className="pane-head">
                   <button className="tab active">{sidePane?.label ?? 'Filter'}</button>
+                  {selectionInSidePane && <div className="pane-head-tools">{selectionTools}</div>}
                 </div>
                 <div className="pane-body">
                   {sidePane ? sidePane.render(api) : <FilterPanel entries={entries} state={filters} onChange={setFilters} />}
@@ -347,6 +364,7 @@ export function Workspace({
                 ))}
               </div>
               {toolbar?.(api)}
+              {!selectionInSidePane && selectionTools}
               <select
                 className="input"
                 style={{ width: 'auto', minHeight: 28, padding: '2px 8px', fontSize: 13 }}
@@ -420,16 +438,6 @@ export function Workspace({
                 {visible.length !== entries.length && ` (${entries.length - visible.length} hidden)`}
                 {selected.length > 0 && `, ${selected.length} selected`}
               </span>
-              {visible.length > 0 && selected.length < visible.length && (
-                <button className="link-btn" onClick={() => setSelection(new Set(visible.map((e) => e.rel)))}>
-                  Select all
-                </button>
-              )}
-              {selection.size > 0 && (
-                <button className="link-btn" onClick={() => setSelection(new Set())}>
-                  Clear
-                </button>
-              )}
               {highlight && issueCount > 0 && <span className="warning-text">{issueCount} with issues</span>}
               {listing.isFetching && <span className="subtle">Refreshing…</span>}
               <span className="grow" />
