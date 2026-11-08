@@ -113,6 +113,39 @@ function VideoTable({ api, settings: c }: { api: WorkspaceApi; settings: Setting
         <div className="empty" style={{ minHeight: 160 }}>
           {videos.length ? 'Every video here is already small or efficient. Show all videos to see them.' : 'No videos in this folder. Tick Subfolders to scan deeper.'}
         </div>
+      ) : api.compact ? (
+        // Phones: one card per video (name, then length · resolution · codec, then bitrate · size).
+        <div className="convert-cards">
+          {rows.map((e) => {
+            const m = e.meta;
+            const bps = bitrateOf(m, e.size);
+            const skip = c ? convertSkipReason(e, c) : null;
+            return (
+              <div
+                key={e.rel}
+                data-rel={e.rel}
+                className={`file-row convert-card${api.selectedRels.has(e.rel) ? ' selected' : ''}${focusedRel === e.rel ? ' focused' : ''}`}
+                onClick={() => api.pick(e.rel)}
+              >
+                <SelectCheck rel={e.rel} checked={api.selectedRels.has(e.rel)} pick={api.pick} />
+                <img src={thumbUrl(e, 320)} alt="" loading="lazy" draggable={false} />
+                <div className="file-row-text">
+                  <span className="file-row-name">{e.name}</span>
+                  <span className="caption muted">
+                    {[duration(m.duration), m.width && m.height ? `${m.width}×${m.height}` : '', m.videoCodec ? CODEC_LABEL[m.videoCodec] : '']
+                      .filter((x) => x && x !== '—')
+                      .join(' · ')}
+                  </span>
+                  <span className="caption subtle mono">
+                    {bps !== undefined ? `${formatBitrate(bps)} · ` : ''}
+                    {formatBytes(e.size)}
+                  </span>
+                </div>
+                {skip === 'codec' || skip === 'bitrate' ? <span className="pill">{SKIP_TEXT[skip]}</span> : <span className="pill pill-accent">Candidate</span>}
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <table className="table">
           <thead>

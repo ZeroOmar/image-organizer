@@ -4,6 +4,8 @@ import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panel
 import { useSearchParams } from 'react-router-dom';
 import { runJobAndWait, useFolder, useSettings, waitForJob } from '../api/hooks';
 import { ContextMenu, type MenuItem } from '../components/ContextMenu';
+import { DockSheet, Sheet } from '../components/Sheet';
+import { useIsCompact } from '../components/useCompact';
 import { FolderTree } from '../components/FolderTree';
 import { ContentGrid } from './ContentGrid';
 import { FolderDialog, type FolderDialogKind } from './dialogs/FolderDialogs';
@@ -12,6 +14,7 @@ import { applyFilters, sortEntries, type FilterState, type SortKey } from './fil
 import { MetadataPanel, type MetadataEditing } from './MetadataPanel';
 import { PreviewPane } from './PreviewPane';
 import { useSelectClick, type PickModifiers, type Selection } from './useSelectClick';
+import { Viewer } from './Viewer';
 
 export interface WorkspaceApi {
   root: RootName;
@@ -31,6 +34,10 @@ export interface WorkspaceApi {
   pick: (rel: string, m?: PickModifiers) => void;
   /** Open the right-click / long-press menu for a file (or empty space) at a viewport point; for custom panes. */
   openMenu: (x: number, y: number, rel: string | null) => void;
+  /** Phone layout (≤ 768px): custom panes switch to touch-sized rows or cards. */
+  compact: boolean;
+  /** Phones: open the full-screen viewer on a file, swiping through `list` (default: the visible files). */
+  view: (rel: string, list?: EnrichedEntry[]) => void;
 }
 
 /** A batch action, rendered both as a BatchBar button (via `actionButtons`) and as a context-menu item. */
@@ -45,16 +52,50 @@ export interface BatchAction {
 }
 
 export function actionButtons(actions: BatchAction[], selected: number) {
-  return actions.map((a) => (
-    <button
-      key={a.label}
-      className={`btn btn-sm ${a.variant ? `btn-${a.variant}` : ''}`}
-      disabled={a.disabled || selected < (a.min ?? 1)}
-      onClick={a.run}
-    >
+  return <ActionButtons actions={actions} selected={selected} />;
+}
+
+/** How many actions a phone shows as buttons; the rest go in the ⋯ menu. */
+const COMPACT_ACTIONS = 3;
+
+function ActionButtons({ actions, selected }: { actions: BatchAction[]; selected: number }) {
+  const compact = useIsCompact();
+  const [more, setMore] = useState<{ x: number; y: number } | null>(null);
+  const off = (a: BatchAction) => a.disabled || selected < (a.min ?? 1);
+  const button = (a: BatchAction) => (
+    <button key={a.label} className={`btn btn-sm ${a.variant ? `btn-${a.variant}` : ''}`} disabled={off(a)} onClick={a.run}>
       {a.label}
     </button>
-  ));
+  );
+  if (!compact) return <>{actions.map(button)}</>;
+  // Phones show the actions only while files are selected (the bar is hidden otherwise).
+  if (selected === 0) return null;
+  if (actions.length <= COMPACT_ACTIONS + 1) return <>{actions.map(button)}</>;
+  // Phones: the first few actions stay buttons, the rest (with Trash last) open from ⋯.
+  const rest = actions.slice(COMPACT_ACTIONS);
+  return (
+    <>
+      {actions.slice(0, COMPACT_ACTIONS).map(button)}
+      <button
+        className="btn btn-sm"
+        aria-label="More actions"
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setMore({ x: r.right, y: r.top });
+        }}
+      >
+        ⋯
+      </button>
+      {more && (
+        <ContextMenu
+          x={more.x}
+          y={more.y}
+          items={rest.map((a) => ({ label: a.label, onSelect: a.run, disabled: off(a), danger: a.variant === 'danger', separator: a.variant === 'danger' }))}
+          onClose={() => setMore(null)}
+        />
+      )}
+    </>
+  );
 }
 
 /** An open context menu: where, for which file, and the range action when there is an anchor. */
@@ -122,8 +163,12 @@ export function Workspace({
   onEditGps?: (targets: FileRef[], focused: EnrichedEntry) => void;
   /** Replaces the thumbnail grid in the center pane. */
   content?: (api: WorkspaceApi) => ReactNode;
-  /** Replaces the Filter pane under the folder tree. `selectionTools` moves Select all / Clear into its header. */
-  sidePane?: { label: string; render: (api: WorkspaceApi) => ReactNode; selectionTools?: boolean };
+  /**
+   * Replaces the Filter pane under the folder tree. `selectionTools` moves Select all / Clear into its header.
+   * `dock`: on phones, show it as a resizable panel under the content (e.g. the GPS file list next to the map)
+   * instead of a bottom sheet behind a button.
+   */
+  sidePane?: { label: string; render: (api: WorkspaceApi) => ReactNode; selectionTools?: boolean; dock?: boolean };
   /** Replaces the thumbnail Size slider at the right of the status bar. */
   statusTools?: ReactNode;
 }) {
@@ -167,12 +212,19 @@ export function Workspace({
   const [filters, setFilters] = useState<FilterState>({});
   const [selection, setSelection] = useState<Selection>(new Set());
   const [focusedRel, setFocusedRel] = useState<string | null>(null);
-  const [leftTab] = useState<'folders'>('folders');
   const [metaTab, setMetaTab] = useState<'summary' | 'all'>('summary');
   const [menu, setMenu] = useState<MenuRequest | null>(null);
   const [folderMenu, setFolderMenu] = useState<{ x: number; y: number; rel: string; shift?: boolean } | null>(null);
   const [folderDialog, setFolderDialog] = useState<{ kind: FolderDialogKind; rel: string; permanent?: boolean } | null>(null);
   const shift = useShiftKey(!!folderMenu, !!folderMenu?.shift);
+  // Phone layout: selection mode (taps toggle), the full-screen viewer, bottom sheets, grid columns.
+  const compact = useIsCompact();
+  const [selectMode, setSelectMode] = useState(false);
+  const [viewing, setViewing] = useState(false);
+  const [viewList, setViewList] = useState<EnrichedEntry[] | null>(null);
+  const [sheet, setSheet] = useState<'folders' | 'side' | null>(null);
+  const [cols, setCols] = useStored(`io.thumbCols`, 3);
+  const selecting = compact && (selectMode || selection.size > 0);
 
   const settings = useSettings().data;
   const listing = useFolder(root, folder, recursive);
@@ -197,6 +249,8 @@ export function Workspace({
     });
     setSelection(new Set());
     setFocusedRel(null);
+    setSelectMode(false);
+    setViewing(false);
   };
 
   // After a folder op, keep showing the same files: follow a renamed/moved folder, leave a deleted one.
@@ -244,6 +298,35 @@ export function Workspace({
     if (rel) anchor.current = rel;
   };
 
+  // Phones: outside selection mode a tap opens the viewer; in it (or on the checkbox) a tap toggles.
+  const compactPick = (rel: string, m: PickModifiers = {}) => {
+    if (selecting || m.toggle || m.meta || m.shift) {
+      setSelectMode(true);
+      pick(rel, m.shift ? m : { toggle: true });
+      return;
+    }
+    setFocusedRel(rel);
+    setViewList(null);
+    setViewing(true);
+  };
+  // Phones: a long-press starts selection mode with that file instead of opening the context menu.
+  const compactLongPress = (_x: number, _y: number, rel: string | null) => {
+    if (!rel) return;
+    setSelectMode(true);
+    if (!selection.has(rel)) pick(rel, { toggle: true });
+  };
+  // Custom panes (GPS list and markers, Convert rows) on phones: while selecting, a tap toggles like the grid.
+  const panePick = (rel: string, m: PickModifiers = {}) => (selecting && !m.shift ? pick(rel, { toggle: true }) : pick(rel, m));
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelection(new Set());
+  };
+  // The tab bar gives way to the batch bar while selecting.
+  useEffect(() => {
+    document.body.classList.toggle('io-selecting', selecting);
+    return () => document.body.classList.remove('io-selecting');
+  }, [selecting]);
+
   const api: WorkspaceApi = {
     root,
     folder,
@@ -256,8 +339,14 @@ export function Workspace({
     selectedRels: selection,
     setSelection,
     focusRel: setFocusedRel,
-    pick,
+    pick: compact ? panePick : pick,
     openMenu,
+    compact,
+    view: (rel, list) => {
+      setFocusedRel(rel);
+      setViewList(list ?? null);
+      setViewing(true);
+    },
   };
 
   // Like Bridge: edits in the Metadata panel apply to the whole selection when it includes the shown file.
@@ -314,6 +403,219 @@ export function Workspace({
     </div>
   );
 
+  const sortSelect = (
+    <select
+      className="input sort-select"
+      value={`${sort.key}:${sort.desc ? 'desc' : 'asc'}`}
+      onChange={(e) => {
+        const [key, dir] = e.target.value.split(':');
+        setSort({ key: key as SortKey, desc: dir === 'desc' });
+      }}
+      aria-label="Sort"
+    >
+      <option value="date:asc">Date ↑</option>
+      <option value="date:desc">Date ↓</option>
+      <option value="name:asc">Name A–Z</option>
+      <option value="name:desc">Name Z–A</option>
+      <option value="mtime:desc">File date ↓</option>
+      <option value="size:desc">Size ↓</option>
+    </select>
+  );
+
+  const folderTree = (
+    <FolderTree
+      root={root}
+      selected={folder}
+      onSelect={(rel) => {
+        go(rel);
+        if (compact) setSheet(null);
+      }}
+      rootLabel={rootLabel}
+      onMenu={root === 'trash' ? undefined : (x, y, rel, shift) => setFolderMenu({ x, y, rel, shift })}
+    />
+  );
+  const subfoldersCheck = (
+    <label className="check caption" title="Include files in subfolders">
+      <input type="checkbox" checked={recursive} onChange={(e) => setRecursive(e.target.checked)} />
+      Subfolders
+    </label>
+  );
+  const sideContent = sidePane ? sidePane.render(api) : <FilterPanel entries={entries} state={filters} onChange={setFilters} />;
+
+  const main = listing.error ? (
+    <div className="empty error-text">{(listing.error as Error).message}</div>
+  ) : content ? (
+    content(api)
+  ) : (
+    <ContentGrid
+      entries={visible}
+      selection={selection}
+      onSelection={setSelection}
+      focused={focused?.rel ?? null}
+      pick={compact ? compactPick : pick}
+      size={size}
+      columns={compact ? cols : undefined}
+      highlight={highlight}
+      onDropFiles={onDropFiles ? (files) => onDropFiles(folder, files) : undefined}
+      onMenu={compact ? compactLongPress : actions ? openMenu : undefined}
+      empty={listing.isLoading ? 'Reading metadata…' : entries.length ? 'No files match the filters.' : emptyText}
+    />
+  );
+
+  // Menus and folder dialogs (portals); the same in both layouts.
+  const overlays = (
+    <>
+      {folderMenu && (
+        <ContextMenu
+          x={folderMenu.x}
+          y={folderMenu.y}
+          title={folderMenu.rel ? folderMenu.rel.split('/').pop() : rootLabel}
+          items={folderMenuItems(folderMenu.rel)}
+          onClose={() => setFolderMenu(null)}
+        />
+      )}
+      {folderDialog && (
+        <FolderDialog
+          kind={folderDialog.kind}
+          folder={{ root, rel: folderDialog.rel }}
+          permanent={folderDialog.permanent}
+          onClose={() => setFolderDialog(null)}
+          onApplied={(op, jobId) => {
+            const src = folderDialog.rel;
+            void waitForJob(jobId).then((j) => j.status === 'done' && followFolder(src, op));
+          }}
+        />
+      )}
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          title={selected.length ? `${selected.length} selected` : undefined}
+          items={menuItems(menu)}
+          onClose={() => setMenu(null)}
+        />
+      )}
+    </>
+  );
+
+  if (compact) {
+    // The viewer can show files outside the listing (e.g. a duplicate group found in subfolders).
+    const viewEntry = (viewList && focusedRel ? viewList.find((e) => e.rel === focusedRel) : undefined) ?? focused;
+    const hidden = entries.length - visible.length;
+    const activeFilters = sidePane ? 0 : Object.values(filters).filter((v) => v.length).length;
+    return (
+      <div className="workspace compact">
+        <div className="m-head">
+          {selecting ? (
+            <>
+              <button className="btn btn-ghost icon-btn" onClick={exitSelect} aria-label="Done selecting">
+                ✕
+              </button>
+              <span className="m-count grow">{selected.length ? `${selected.length} selected` : 'Tap files to select'}</span>
+              <button
+                className="btn btn-ghost btn-sm"
+                disabled={visible.length === 0 || selected.length === visible.length}
+                onClick={() => setSelection(new Set(visible.map((e) => e.rel)))}
+              >
+                All
+              </button>
+            </>
+          ) : (
+            <>
+              {crumbs.length > 0 && (
+                <button className="btn btn-ghost icon-btn" onClick={() => go(crumbs.slice(0, -1).join('/'))} aria-label="Parent folder">
+                  ‹
+                </button>
+              )}
+              <button className="m-folder grow" onClick={() => setSheet('folders')}>
+                <span className="m-folder-name">
+                  {crumbs.length ? crumbs[crumbs.length - 1] : rootLabel} <span className="subtle">▾</span>
+                </span>
+                <span className="m-folder-sub">
+                  {[
+                    crumbs.length ? [rootLabel, ...crumbs.slice(0, -1)].join(' › ') : '',
+                    `${visible.length} item${visible.length === 1 ? '' : 's'}${hidden > 0 ? ` (${hidden} hidden)` : ''}`,
+                    listing.isFetching ? 'Refreshing…' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </button>
+              <button className="btn btn-sm" onClick={() => setSelectMode(true)} disabled={visible.length === 0}>
+                Select
+              </button>
+            </>
+          )}
+        </div>
+        <div className="m-tools">
+          {toolbar?.(api)}
+          {!sidePane?.dock && (
+            <button className={`m-chip${activeFilters ? ' active' : ''}`} onClick={() => setSheet('side')}>
+              {sidePane?.label ?? 'Filter'}
+              {activeFilters > 0 && ` · ${activeFilters}`}
+            </button>
+          )}
+          {sortSelect}
+          {highlight && issueCount > 0 && <span className="warning-text caption">{issueCount} with issues</span>}
+          <span className="grow" />
+          {!content && (
+              <div className="stepper" aria-label="Columns">
+                <button className="btn btn-ghost icon-btn" disabled={cols >= 5} onClick={() => setCols(cols + 1)} aria-label="Smaller thumbnails">
+                  −
+                </button>
+                <button className="btn btn-ghost icon-btn" disabled={cols <= 2} onClick={() => setCols(cols - 1)} aria-label="Larger thumbnails">
+                  +
+                </button>
+              </div>
+            )}
+        </div>
+        {main}
+        {sidePane?.dock && (
+          <DockSheet title={sidePane.label} tools={sidePane.selectionTools ? selectionTools : undefined}>
+            {sideContent}
+          </DockSheet>
+        )}
+        {overlays}
+        <div className={`batchbar${selecting ? '' : ' idle'}`}>{batchBar(api)}</div>
+        {sheet === 'folders' && (
+          <Sheet title="Folders" full tools={<div className="row">{folderTools}{subfoldersCheck}</div>} onClose={() => setSheet(null)}>
+            {folderTree}
+          </Sheet>
+        )}
+        {sheet === 'side' && (
+          <Sheet
+            title={sidePane?.label ?? 'Filter'}
+            full={!!sidePane}
+            tools={
+              sidePane?.selectionTools ? selectionTools : activeFilters > 0 ? (
+                <button className="btn btn-ghost btn-sm" onClick={() => setFilters({})}>
+                  Reset
+                </button>
+              ) : undefined
+            }
+            onClose={() => setSheet(null)}
+          >
+            {sideContent}
+          </Sheet>
+        )}
+        {viewing && viewEntry && (
+          <Viewer
+            entries={viewList ?? visible}
+            entry={viewEntry}
+            onNavigate={setFocusedRel}
+            onClose={() => setViewing(false)}
+            onSelect={() => {
+              setViewing(false);
+              setSelectMode(true);
+              setSelection(new Set([viewEntry.rel]));
+            }}
+            editing={metaEditing}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="workspace">
       <Group orientation="horizontal" id={`io-${root}-h`} defaultLayout={h.defaultLayout} onLayoutChanged={h.onLayoutChanged}>
@@ -322,18 +624,13 @@ export function Workspace({
             <Panel id="folders" defaultSize="45%" minSize="80px">
               <div className="pane">
                 <div className="pane-head">
-                  <button className={`tab ${leftTab === 'folders' ? 'active' : ''}`}>Folders</button>
+                  <button className="tab active">Folders</button>
                   <div className="pane-head-tools">
                     {folderTools}
-                    <label className="check caption" title="Include files in subfolders">
-                      <input type="checkbox" checked={recursive} onChange={(e) => setRecursive(e.target.checked)} />
-                      Subfolders
-                    </label>
+                    {subfoldersCheck}
                   </div>
                 </div>
-                <div className="pane-body">
-                  <FolderTree root={root} selected={folder} onSelect={go} rootLabel={rootLabel} onMenu={root === 'trash' ? undefined : (x, y, rel, shift) => setFolderMenu({ x, y, rel, shift })} />
-                </div>
+                <div className="pane-body">{folderTree}</div>
               </div>
             </Panel>
             <Separator />
@@ -343,9 +640,7 @@ export function Workspace({
                   <button className="tab active">{sidePane?.label ?? 'Filter'}</button>
                   {selectionInSidePane && <div className="pane-head-tools">{selectionTools}</div>}
                 </div>
-                <div className="pane-body">
-                  {sidePane ? sidePane.render(api) : <FilterPanel entries={entries} state={filters} onChange={setFilters} />}
-                </div>
+                <div className="pane-body">{sideContent}</div>
               </div>
             </Panel>
           </Group>
@@ -365,72 +660,10 @@ export function Workspace({
               </div>
               {toolbar?.(api)}
               {!selectionInSidePane && selectionTools}
-              <select
-                className="input"
-                style={{ width: 'auto', minHeight: 28, padding: '2px 8px', fontSize: 13 }}
-                value={`${sort.key}:${sort.desc ? 'desc' : 'asc'}`}
-                onChange={(e) => {
-                  const [key, dir] = e.target.value.split(':');
-                  setSort({ key: key as SortKey, desc: dir === 'desc' });
-                }}
-                aria-label="Sort"
-              >
-                <option value="date:asc">Date ↑</option>
-                <option value="date:desc">Date ↓</option>
-                <option value="name:asc">Name A–Z</option>
-                <option value="name:desc">Name Z–A</option>
-                <option value="mtime:desc">File date ↓</option>
-                <option value="size:desc">Size ↓</option>
-              </select>
+              {sortSelect}
             </div>
-            {listing.error ? (
-              <div className="empty error-text">{(listing.error as Error).message}</div>
-            ) : content ? (
-              content(api)
-            ) : (
-              <ContentGrid
-                entries={visible}
-                selection={selection}
-                onSelection={setSelection}
-                focused={focused?.rel ?? null}
-                pick={pick}
-                size={size}
-                highlight={highlight}
-                onDropFiles={onDropFiles ? (files) => onDropFiles(folder, files) : undefined}
-                onMenu={actions ? openMenu : undefined}
-                empty={listing.isLoading ? 'Reading metadata…' : entries.length ? 'No files match the filters.' : emptyText}
-              />
-            )}
-            {folderMenu && (
-              <ContextMenu
-                x={folderMenu.x}
-                y={folderMenu.y}
-                title={folderMenu.rel ? folderMenu.rel.split('/').pop() : rootLabel}
-                items={folderMenuItems(folderMenu.rel)}
-                onClose={() => setFolderMenu(null)}
-              />
-            )}
-            {folderDialog && (
-              <FolderDialog
-                kind={folderDialog.kind}
-                folder={{ root, rel: folderDialog.rel }}
-                permanent={folderDialog.permanent}
-                onClose={() => setFolderDialog(null)}
-                onApplied={(op, jobId) => {
-                  const src = folderDialog.rel;
-                  void waitForJob(jobId).then((j) => j.status === 'done' && followFolder(src, op));
-                }}
-              />
-            )}
-            {menu && (
-              <ContextMenu
-                x={menu.x}
-                y={menu.y}
-                title={selected.length ? `${selected.length} selected` : undefined}
-                items={menuItems(menu)}
-                onClose={() => setMenu(null)}
-              />
-            )}
+            {main}
+            {overlays}
             <div className="batchbar">{batchBar(api)}</div>
             <div className="statusbar">
               <span>

@@ -52,6 +52,33 @@ React 19 + Vite, React Router, TanStack Query, react-resizable-panels v4, react-
 - Filters (`filters.ts`) are computed client-side from the listing: OR within a facet, AND across facets.
 - The page passes `batchBar(api)` (and optionally `toolbar(api)`) render props, an optional `statusTools` node that replaces the thumbnail Size slider, plus an optional `folderTools` node shown in the Folders pane header next to the **Subfolders** checkbox; `WorkspaceApi` gives `selected`, `selection` (FileRefs), `focused`, `entries`, `folder`.
 
+## Phone layout (≤ 768px)
+
+`components/useCompact.ts` (`useIsCompact()`) switches the layout; the routes, API, jobs and dialogs are the same.
+
+```
+┌ logo · Page title          Jobs ┐  TopNav compact
+├ ‹  Bikers ▾              Select ┤  folder button opens the Folders sheet
+│    media › Trips · 10 items     │
+├ Upload Filter Sort  issues  − + ┤  toolbar · side-pane sheet · Sort · columns
+│ ▢ ▢ ▢                           │  ContentGrid, 2–5 columns
+│ ▢ ▢ ▢                           │
+├ Rename  Dates  GPS  ⋯           ┤  batch bar (only while selecting)
+└ Organize  Import  GPS  More     ┘  TabBar (hidden while selecting)
+```
+
+- Shell: `TopNav compact` shows the page title and Jobs. `components/TabBar.tsx` holds Organize · Import · GPS, and More opens a `Sheet` with the other pages and Sign out. Safe-area insets are applied (`viewport-fit=cover`).
+- Workspace: one column. Folders and the Filter (or the page's `sidePane`) open as bottom sheets (`components/Sheet.tsx`). The column count is stored in `io.thumbCols`.
+- Selection mode: start it with **Select**, a long-press, or a tile checkbox. While selecting, a tap toggles a file, the header shows "✕ N selected · All", and `body.io-selecting` hides the tab bar. Outside selection mode a tap opens the viewer.
+- Viewer (`organize/Viewer.tsx`): full screen. Swipe left/right (or ‹ ›, arrow keys) between the visible files; swipe up or tap **Info** for the Metadata / All tags panel, with inline editing on Organize; swipe down or ✕ closes it. **Select** switches to selection mode with that file selected.
+- Batch bar: `actionButtons()` shows the first 3 actions and puts the rest (Trash last) in a ⋯ menu.
+- Dialogs are full screen, with the footer pinned. `PlanTable` shows one card per change instead of the table.
+- Custom panes get `api.compact` and `api.view(rel, list?)`. On phones `api.pick` toggles while selecting, so list rows and map markers behave like grid tiles.
+- GPS: `sidePane.dock` shows the Files list as a `DockSheet` under the map. It stays usable alongside the map: tap its handle to cycle peek / half / full, or drag it. Place mode works by selecting files in the list, then tapping the map. Map hints use touch wording. The fit padding is capped to 20% of the map size, so a short map still fits the markers. The Zoom slider (`statusTools`) is desktop only; on phones you pinch.
+- Convert: the video table becomes cards (name; length · resolution · codec; bitrate · size; status pill).
+- Duplicates: each group's files scroll sideways. A tap opens the viewer on that group.
+- Trash: one card per item, plus Select all. Settings and Automation keep their layouts; inputs are capped at the screen width and page headings take their own line.
+
 ## Inline metadata editing
 
 Pass `onEditGps` to `Workspace` to enable it (Organize does; Import stays read-only).

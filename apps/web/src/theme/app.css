@@ -1665,3 +1665,642 @@ pre.code {
   font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--ink-muted);
 }
+
+/* Sort select in the content toolbar. */
+.input.sort-select {
+  width: auto;
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 13px;
+}
+
+/* ---------- Phone layout (≤ 768px, `useIsCompact`) ---------- */
+.shell.compact {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.topnav.compact {
+  gap: var(--s-sm);
+  height: calc(var(--nav-h) + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+}
+.topnav-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+.shell.compact .jobs-panel {
+  position: fixed;
+  left: var(--s-xs);
+  right: var(--s-xs);
+  top: calc(var(--nav-h) + env(safe-area-inset-top) + 4px);
+  width: auto;
+}
+
+/* Bottom tab bar */
+.tabbar {
+  flex: none;
+  display: flex;
+  border-top: 1px solid var(--hairline-soft);
+  background: var(--canvas);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+body.io-selecting .tabbar {
+  display: none;
+}
+.tab-item {
+  flex: 1;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  background: none;
+  color: var(--ink-subtle);
+  font: 600 11px var(--font);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-item:hover {
+  text-decoration: none;
+}
+.tab-item.active {
+  color: var(--accent);
+}
+.more-list {
+  display: flex;
+  flex-direction: column;
+  padding: var(--s-xxs) 0 var(--s-xs);
+}
+.more-link {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--s-md);
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--ink);
+  font: 600 16px var(--font);
+  text-align: left;
+  cursor: pointer;
+}
+.more-link:hover {
+  text-decoration: none;
+  background: var(--surface-2);
+}
+.more-link.active {
+  color: var(--accent);
+}
+
+/* Bottom sheet */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.sheet {
+  max-height: 85dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border-top: 1px solid var(--hairline);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.sheet.full {
+  height: 85dvh;
+}
+.sheet-grip {
+  width: 36px;
+  height: 4px;
+  margin: var(--s-xs) auto 0;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-xs);
+  padding: var(--s-xs) var(--s-xs) var(--s-xs) var(--s-md);
+  border-bottom: 1px solid var(--hairline-soft);
+}
+.sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 var(--s-xs);
+}
+
+/* Compact workspace: one column */
+.shell.compact .workspace,
+.workspace.compact {
+  height: 100%;
+}
+.workspace.compact {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.m-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-xs);
+  min-height: 52px;
+  padding: var(--s-xxs) var(--s-sm);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--hairline-soft);
+}
+.m-head .icon-btn {
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 20px;
+}
+.m-folder {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.m-folder-name,
+.m-folder-sub {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-folder-name {
+  font: 700 16px/1.3 var(--font);
+}
+.m-folder-sub {
+  font-size: 12px;
+  color: var(--ink-subtle);
+}
+.m-count {
+  font-size: 16px;
+  font-weight: 700;
+}
+.m-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-xs);
+  padding: 6px var(--s-sm);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--hairline-soft);
+  white-space: nowrap;
+}
+.m-chip {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hairline);
+  background: var(--surface-1);
+  color: var(--ink);
+  font: 600 13px var(--font);
+  cursor: pointer;
+}
+.m-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.m-tools .btn-sm {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 14px;
+}
+.m-tools .sort-select {
+  min-height: 36px;
+  border-radius: var(--r-pill);
+}
+.stepper {
+  display: flex;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+}
+.stepper .icon-btn {
+  min-width: 40px;
+  min-height: 34px;
+  font-size: 18px;
+}
+.workspace.compact .grid-area {
+  padding: var(--s-xxs);
+}
+.workspace.compact .tiles {
+  gap: var(--s-xxs);
+}
+.workspace.compact .tile {
+  padding: 0;
+  gap: 0;
+  border-radius: var(--r-xs);
+  contain-intrinsic-size: auto 120px;
+}
+.workspace.compact .tile-thumb {
+  border-radius: var(--r-xs);
+}
+.workspace.compact .tile-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.workspace.compact .tiles .tile-name,
+.workspace.compact .tiles .tile-meta {
+  display: none;
+}
+.workspace.compact .tile-badge {
+  top: 6px;
+  right: 6px;
+}
+/* Checkboxes only while selecting; the selected tile gets a green ring. */
+.workspace.compact .tile-check {
+  top: 2px;
+  left: 2px;
+}
+body:not(.io-selecting) .workspace.compact .tile-check {
+  display: none;
+}
+.workspace.compact .tile.selected .tile-thumb {
+  opacity: 0.8;
+}
+.workspace.compact .batchbar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: var(--s-xs);
+  padding: var(--s-xs) var(--s-sm) calc(var(--s-xs) + env(safe-area-inset-bottom));
+}
+.workspace.compact .batchbar > .eyebrow {
+  display: none;
+}
+.workspace.compact .batchbar .btn-sm {
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+/* Not selecting: actions render nothing, so the bar only shows when the page has more (upload progress, Duplicates). */
+.workspace.compact .batchbar.idle:not(:has(> :not(.eyebrow, .grow))) {
+  display: none;
+}
+
+/* Full-screen viewer */
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.viewer-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-xs);
+  padding: var(--s-xs) var(--s-sm);
+}
+.viewer-head .icon-btn {
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 20px;
+}
+.viewer-title {
+  min-width: 0;
+}
+.viewer-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+.viewer-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.viewer-stage {
+  overflow: hidden;
+}
+.viewer-stage img,
+.viewer-stage video {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  -webkit-touch-callout: none;
+}
+.viewer-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 64px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--ink);
+  font-size: 32px;
+  cursor: pointer;
+}
+.viewer-nav.prev {
+  left: var(--s-xxs);
+}
+.viewer-nav.next {
+  right: var(--s-xxs);
+}
+@media (pointer: coarse) {
+  /* Swipe instead; the arrows stay for mouse users on narrow windows. */
+  .viewer-nav {
+    display: none;
+  }
+}
+.viewer-foot {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: var(--s-xs) var(--s-sm) var(--s-sm);
+}
+.viewer-foot .btn {
+  min-height: 44px;
+  min-width: 120px;
+}
+.viewer-info {
+  flex: none;
+  height: 55%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border-top: 1px solid var(--hairline);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  overflow: hidden;
+}
+.viewer-info-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Plan preview as cards (phones) */
+.plan-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+}
+.plan-card {
+  padding: var(--s-xs) var(--s-sm);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  overflow-wrap: anywhere;
+}
+.plan-card.error {
+  border: 1px solid var(--error);
+}
+.plan-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-xs);
+  margin-bottom: 2px;
+}
+.plan-before {
+  text-decoration: line-through;
+}
+
+@media (max-width: 768px) {
+  /* Dialogs become full-screen sheets with the actions pinned at the bottom. */
+  .dialog-backdrop {
+    padding: 0;
+    place-items: stretch;
+  }
+  .dialog,
+  .dialog.wide {
+    width: 100%;
+    max-height: none;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  }
+  .dialog-head {
+    padding: var(--s-sm) var(--s-md);
+  }
+  .dialog-body {
+    flex: 1;
+    padding: var(--s-md);
+  }
+  .dialog-foot {
+    flex-wrap: wrap;
+    padding: var(--s-sm) var(--s-md) calc(var(--s-sm) + env(safe-area-inset-bottom));
+  }
+  .dialog-foot .btn {
+    min-height: 44px;
+  }
+}
+
+/* ---------- Phone layout, page panes (phase 3) ---------- */
+
+/* Docked panel under the content (GPS file list): peek shows just the handle. */
+.dock-sheet {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-1);
+  border-top: 1px solid var(--hairline);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  margin-top: calc(-1 * var(--r-xl));
+  position: relative;
+  z-index: 1;
+  transition: height 0.2s ease;
+}
+.dock-sheet.dragging {
+  transition: none;
+}
+.dock-handle {
+  flex: none;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.dock-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-xs);
+  min-height: 40px;
+  padding: 0 var(--s-sm) 0 var(--s-md);
+}
+.dock-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--hairline-soft);
+}
+.dock-body .file-list-head {
+  background: var(--surface-1);
+}
+.workspace.compact .file-row {
+  min-height: 52px;
+  padding: 6px var(--s-sm);
+}
+.workspace.compact .file-row img {
+  width: 44px;
+  height: 44px;
+}
+.workspace.compact .file-row-name {
+  font-size: 14px;
+}
+
+/* GPS map toolbar: one compact block, search on its own line. */
+.workspace.compact .map-toolbar {
+  top: var(--s-xs);
+  left: var(--s-xs);
+  right: 52px;
+}
+.workspace.compact .map-toolbar > .row {
+  flex-wrap: wrap;
+  width: 100%;
+}
+.workspace.compact .map-search {
+  flex: 1 1 100%;
+  width: auto;
+}
+.workspace.compact .map-search .search-results {
+  width: calc(100vw - 72px);
+}
+.workspace.compact .map-hint {
+  font-size: 12px;
+}
+.workspace.compact .map-bar {
+  left: var(--s-xs);
+  right: var(--s-xs);
+  bottom: calc(var(--r-xl) + var(--s-xs));
+}
+.workspace.compact .map-bar .btn-sm {
+  min-height: 40px;
+}
+
+/* Convert: video cards */
+.convert-cards {
+  display: flex;
+  flex-direction: column;
+}
+.convert-card {
+  border-bottom: 1px solid var(--hairline-soft);
+}
+.convert-card .file-row-text {
+  gap: 1px;
+}
+
+/* Duplicates: each group is a card whose files scroll sideways. */
+.workspace.compact .dupe-list {
+  padding: var(--s-xs);
+  gap: var(--s-xs);
+}
+.workspace.compact .dupe-group {
+  padding: var(--s-sm) 0 var(--s-sm) var(--s-sm);
+}
+.workspace.compact .dupe-group-head {
+  flex-wrap: wrap;
+  padding-right: var(--s-sm);
+  white-space: nowrap;
+}
+.workspace.compact .dupe-group-head > * {
+  flex: 0 0 auto;
+}
+.workspace.compact .dupe-group-head > .grow {
+  flex: 1 0 auto;
+}
+.workspace.compact .dupe-group-head .btn-sm {
+  min-height: 40px;
+}
+.workspace.compact .dupe-tiles {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-right: var(--s-sm);
+}
+.workspace.compact .dupe-tile {
+  flex: 0 0 44%;
+  scroll-snap-align: start;
+}
+.workspace.compact .dupe-tile .check {
+  min-height: 36px;
+}
+
+/* Trash: item cards */
+.trash-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+}
+.trash-cards > .check {
+  min-height: 44px;
+}
+.trash-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-sm);
+  padding: var(--s-sm);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  border: 1px solid var(--hairline-translucent);
+  cursor: pointer;
+}
+.trash-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.trash-card input {
+  accent-color: var(--accent);
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex: none;
+}
+.trash-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Plain pages (Settings, Automation, Trash): fixed-width inputs never overflow; headers wrap. */
+@media (max-width: 768px) {
+  .page-inner .input,
+  .page-inner [style*='width'] {
+    max-width: 100%;
+  }
+  .page-inner .row .btn {
+    min-height: 44px;
+  }
+  .display-md {
+    font-size: 30px;
+  }
+  /* Page headings take their own line; the header buttons wrap under them. */
+  .page-inner .row > .display-md {
+    flex: 1 1 100%;
+  }
+}

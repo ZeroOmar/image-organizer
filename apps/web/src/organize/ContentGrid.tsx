@@ -21,6 +21,7 @@ export function ContentGrid({
   focused,
   pick,
   size,
+  columns,
   highlight,
   onDropFiles,
   onMenu,
@@ -33,6 +34,8 @@ export function ContentGrid({
   /** The workspace's click selection (shared with custom panes so they keep one anchor). */
   pick: (rel: string, m?: PickModifiers) => void;
   size: number;
+  /** Phones: a fixed number of columns instead of `size`-px minimum tiles. */
+  columns?: number;
   highlight: boolean;
   onDropFiles?: (files: File[]) => void;
   /** Open the context menu for a tile (or empty space); the workspace applies the selection rules. */
@@ -102,7 +105,7 @@ export function ContentGrid({
         onSelection(new Set());
       } else if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key) && entries.length) {
         e.preventDefault();
-        const cols = Math.max(1, Math.floor((el.clientWidth - 24) / (size + 12)));
+        const cols = columns ?? Math.max(1, Math.floor((el.clientWidth - 24) / (size + 12)));
         const i = Math.max(0, entries.findIndex((x) => x.rel === focused));
         const delta = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key]!;
         const next = entries[Math.min(entries.length - 1, Math.max(0, i + delta))];
@@ -112,7 +115,7 @@ export function ContentGrid({
     };
     el.addEventListener('keydown', onKey);
     return () => el.removeEventListener('keydown', onKey);
-  }, [entries, focused, size, onSelection, pick]);
+  }, [entries, focused, size, columns, onSelection, pick]);
 
   const drag = (e: DragEvent, on: boolean) => {
     if (!onDropFiles || !e.dataTransfer.types.includes('Files')) return;
@@ -150,9 +153,9 @@ export function ContentGrid({
       {entries.length === 0 ? (
         <div className="empty">{empty}</div>
       ) : (
-        <div className="tiles" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${size}px, 1fr))` }}>
+        <div className="tiles" style={{ gridTemplateColumns: columns ? `repeat(${columns}, minmax(0, 1fr))` : `repeat(auto-fill, minmax(${size}px, 1fr))` }}>
           {entries.map((e) => (
-            <Tile key={e.rel} entry={e} selected={selection.has(e.rel)} size={size} highlight={highlight} onClick={click} pick={pick} />
+            <Tile key={e.rel} entry={e} selected={selection.has(e.rel)} size={columns ? 160 : size} highlight={highlight} onClick={click} pick={pick} />
           ))}
         </div>
       )}

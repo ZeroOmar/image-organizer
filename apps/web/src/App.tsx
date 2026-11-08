@@ -2,7 +2,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { keys, useJobEvents, useMe } from './api/hooks';
+import { TabBar } from './components/TabBar';
 import { TopNav } from './components/TopNav';
+import { useIsCompact } from './components/useCompact';
 import { AutomationPage } from './pages/Automation';
 import { ConvertPage } from './pages/Convert';
 import { DuplicatesPage } from './pages/Duplicates';
@@ -21,6 +23,7 @@ export function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const signedIn = !!me.data?.username;
+  const compact = useIsCompact();
   useJobEvents(signedIn);
 
   useEffect(() => {
@@ -43,8 +46,8 @@ export function App() {
   }
 
   return (
-    <div className="shell">
-      <TopNav />
+    <div className={`shell${compact ? ' compact' : ''}`}>
+      <TopNav compact={compact} />
       <main className="page">
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -63,6 +66,7 @@ export function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      {compact && <TabBar />}
     </div>
   );
 }

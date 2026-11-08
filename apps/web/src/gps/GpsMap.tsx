@@ -33,7 +33,12 @@ const PAD_BR: L.PointTuple = [64, 110];
 function fit(map: L.Map, pts: LatLon[], animate = false) {
   if (!pts.length) return;
   if (pts.length === 1) map.setView([pts[0].lat, pts[0].lon], 15, { animate });
-  else map.fitBounds(L.latLngBounds(pts.map((p) => [p.lat, p.lon])), { paddingTopLeft: PAD_TL, paddingBottomRight: PAD_BR, maxZoom: 17, animate });
+  else {
+    // Small maps (phones, with the file list docked below): padding larger than the map breaks fitBounds.
+    const { x, y } = map.getSize();
+    const pad = (t: L.PointTuple): L.PointTuple => [Math.min(t[0], x * 0.2), Math.min(t[1], y * 0.2)];
+    map.fitBounds(L.latLngBounds(pts.map((p) => [p.lat, p.lon])), { paddingTopLeft: pad(PAD_TL), paddingBottomRight: pad(PAD_BR), maxZoom: 17, animate });
+  }
 }
 
 /** Zoom to the markers once per folder (not after every edit), and again whenever `nonce` changes (Fit button). */
@@ -304,8 +309,15 @@ export function GpsMap({ api, onMap }: { api: WorkspaceApi; onMap?: (map: L.Map 
     setPending({ lat: at.lat, lon: at.lng, rels });
   };
 
-  const hint =
-    mode === 'select'
+  const hint = api.compact
+    ? mode === 'select'
+      ? 'Tap a marker to select it.'
+      : mode === 'place'
+        ? nSelected
+          ? `Tap the map to place ${nSelected} file${nSelected === 1 ? '' : 's'}.`
+          : 'Select files in the list below, then tap the map.'
+        : 'Drag on the map to draw a circle around files.'
+    : mode === 'select'
       ? 'Click a marker to select it. Shift or Cmd/Ctrl adds to the selection.'
       : mode === 'place'
         ? nSelected

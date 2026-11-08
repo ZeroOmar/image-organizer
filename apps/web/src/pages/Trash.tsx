@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { api } from '../api/client';
 import { invalidateFiles, useConfig, useTrash } from '../api/hooks';
 import { Dialog } from '../components/Dialog';
+import { useIsCompact } from '../components/useCompact';
 
 const fmtSize = (n: number) => (n > 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.ceil(n / 1e3)} KB`);
 
@@ -13,6 +14,7 @@ export function TrashPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirm, setConfirm] = useState<null | 'selected' | 'all'>(null);
   const [error, setError] = useState<string | null>(null);
+  const compact = useIsCompact();
 
   const run = async (url: string, body: unknown) => {
     setError(null);
@@ -53,6 +55,29 @@ export function TrashPage() {
       {error && <p className="error-text">{error}</p>}
       {isLoading ? null : items.length === 0 ? (
         <div className="card empty">The trash is empty.</div>
+      ) : compact ? (
+        // Phones: one card per item instead of the table.
+        <div className="trash-cards">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={selected.size === items.length}
+              onChange={(e) => setSelected(e.target.checked ? new Set(items.map((i) => i.id)) : new Set())}
+            />
+            Select all ({items.length})
+          </label>
+          {items.map((i) => (
+            <label key={i.id} className={`trash-card${selected.has(i.id) ? ' selected' : ''}`}>
+              <input type="checkbox" checked={selected.has(i.id)} onChange={() => toggle(i.id)} />
+              <span className="trash-card-text">
+                <span className="mono">{i.originalRel}</span>
+                <span className="caption muted">
+                  <span className="pill">{i.originRoot}</span> {fmtSize(i.size)} · {new Date(i.deletedAt).toLocaleString()}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
       ) : (
         <div className="table-wrap">
           <table className="table">

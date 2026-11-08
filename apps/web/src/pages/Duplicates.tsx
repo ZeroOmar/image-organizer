@@ -302,7 +302,8 @@ function GroupList({
                     key={f.rel}
                     data-rel={f.rel}
                     className={`dupe-tile${on ? ' kept' : ''}${focusedRel === f.rel ? ' focused' : ''}`}
-                    onClick={() => api.pick(f.rel)}
+                    // Phones have no preview pane: a tap opens the group in the viewer.
+                    onClick={() => (api.compact ? api.view(f.rel, g.files) : api.pick(f.rel))}
                   >
                     <div className="tile-thumb">
                       <img src={thumbUrl(f, 320)} alt="" loading="lazy" draggable={false} />

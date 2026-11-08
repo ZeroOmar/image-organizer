@@ -2,6 +2,7 @@ import { STEP_INFO, type JobInfo, type PlanResult, type Selection, type Step } f
 import { useState, type ReactNode } from 'react';
 import { planJob, submitJob } from '../api/hooks';
 import { Dialog } from './Dialog';
+import { useIsCompact } from './useCompact';
 
 /** A job that isn't steps on a selection (e.g. a folder operation): how to dry-run and submit it. */
 export interface JobRunner {
@@ -105,6 +106,7 @@ export function ActionDialog({
 }
 
 export function PlanTable({ plan, showStep, steps }: { plan: PlanResult; showStep?: boolean; steps: Step[] }) {
+  const compact = useIsCompact();
   return (
     <>
       {plan.warnings.map((w) => (
@@ -116,6 +118,26 @@ export function PlanTable({ plan, showStep, steps }: { plan: PlanResult; showSte
         <div className="empty" style={{ minHeight: 120 }}>
           Nothing to change — everything already matches.
         </div>
+      ) : compact ? (
+        // Phones: one card per change instead of a four-column table.
+        <ul className="plan-cards">
+          {plan.items.map((i, n) => (
+            <li key={n} className={`plan-card${i.error ? ' error' : ''}`}>
+              <div className="plan-card-head">
+                <span className="mono grow">{i.file.rel.split('/').pop()}</span>
+                {showStep && <span className="pill">{i.action ?? STEP_INFO[steps[i.step]?.type]?.label}</span>}
+              </div>
+              {i.error ? (
+                <div className="error-text caption">{i.error}</div>
+              ) : (
+                <>
+                  {i.before && i.before !== i.file.rel.split('/').pop() && <div className="muted caption plan-before">{i.before}</div>}
+                  <div className="caption">→ {i.after ?? ''}</div>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
       ) : (
         <div className="table-wrap" style={{ maxHeight: '55vh' }}>
           <table className="table">
