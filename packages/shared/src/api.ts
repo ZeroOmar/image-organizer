@@ -73,6 +73,10 @@ export const StepSchema = z.discriminatedUnion('type', [
     crf: z.number().int().min(0).max(51).optional(),
     preset: z.enum(CONVERT_PRESETS).optional(),
   }),
+  /** Turn clockwise without re-encoding (EXIF Orientation, HEIF irot, video rotation). */
+  z.object({ type: z.literal('rotate'), degrees: z.union([z.literal(90), z.literal(180), z.literal(270)]) }),
+  /** Mirror without re-encoding (EXIF Orientation; JPEG only). */
+  z.object({ type: z.literal('mirror'), axis: z.enum(['horizontal', 'vertical']) }),
   z.object({
     type: z.literal('heicToJpeg'),
     /** JPEG quality; unset = Settings → Conversion. */
@@ -98,6 +102,8 @@ export const STEP_INFO: Record<StepType, { label: string; description: string; a
   moveByDate: { label: 'Move into dated folders', description: 'Move into /media folders like {YYYY}/{MM}', automation: true },
   trash: { label: 'Trash', description: 'Move files to the trash', automation: false },
   convert: { label: 'Convert to HEVC', description: 'Re-encode videos to HEVC, keeping resolution and metadata; originals go to the trash', automation: true },
+  rotate: { label: 'Rotate', description: 'Turn photos and videos without re-encoding (orientation tag)', automation: false },
+  mirror: { label: 'Mirror', description: 'Flip JPEG photos without re-encoding (orientation tag), e.g. mirrored selfies', automation: false },
   heicToJpeg: { label: 'Convert HEIC to JPG', description: 'Save HEIC/HEIF photos as JPG next to them, keeping all metadata; originals go to the trash', automation: true },
 };
 

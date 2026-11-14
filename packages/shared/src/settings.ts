@@ -10,6 +10,7 @@ export const ISSUE_CHECK_IDS = [
   'dateMismatchFile',
   'dateMismatchFilename',
   'nameOffTemplate',
+  'frontCamera',
 ] as const;
 export type IssueCheckId = (typeof ISSUE_CHECK_IDS)[number];
 

@@ -1,4 +1,4 @@
-import { parseExifDate, videoCodecOf, type MediaKind, type MediaMeta } from '@io/shared';
+import { isHeif, parseExifDate, videoCodecOf, type MediaKind, type MediaMeta } from '@io/shared';
 import { ExifTool, type WriteTags } from 'exiftool-vendored';
 
 export type TagValue = string | number | string[] | null;
@@ -65,6 +65,11 @@ export class Metadata {
       meta.qtCreationDate = date('CreationDate');
       meta.videoCodec = videoCodecOf(str('CompressorID'));
       meta.bitrate = num('AvgBitrate');
+    }
+    // -n Rotation: video = clockwise degrees (track matrix); HEIF = irot, counter-clockwise quarter turns.
+    const rot = num('Rotation');
+    if (rot !== undefined && (kind === 'video' || isHeif(abs))) {
+      meta.rotation = kind === 'video' ? (((Math.round(rot / 90) * 90) % 360) + 360) % 360 : ((4 - (rot % 4)) % 4) * 90;
     }
     const lat = num('GPSLatitude');
     const lon = num('GPSLongitude');

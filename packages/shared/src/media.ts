@@ -93,7 +93,10 @@ export interface MediaMeta {
   exposureTime?: number;
   focalLength?: number;
   focalLength35?: number;
+  /** EXIF Orientation 1–8 (JPEG; HEIF may repeat its rotation here). */
   orientation?: number;
+  /** HEIF `irot` or video track rotation, in degrees clockwise (0/90/180/270). */
+  rotation?: number;
   duration?: number;
   /** Video: normalized codec of the first video track. */
   videoCodec?: VideoCodec;
@@ -121,6 +124,8 @@ export interface MediaEntry extends FileRef {
   kind: MediaKind;
   size: number;
   mtimeMs: number;
+  /** Changes on every write, including tag writes that keep mtime; versions thumbnail URLs. */
+  ctimeMs?: number;
   meta: MediaMeta;
   metaError?: string;
   /** IANA zone derived from GPS (server-side, offline lookup), when GPS is present. */

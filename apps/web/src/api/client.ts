@@ -31,10 +31,16 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
 export const qs = (params: Record<string, string | number | undefined>) =>
   new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]).toString();
 
-export const thumbUrl = (f: FileRef & { mtimeMs?: number }, size: number) =>
-  `/api/thumb?${qs({ root: f.root, rel: f.rel, size, v: f.mtimeMs ? Math.round(f.mtimeMs) : undefined })}`;
+type Versioned = FileRef & { mtimeMs?: number; ctimeMs?: number };
+/** Cache-buster: ctime also changes on tag writes that keep mtime (e.g. rotating via Orientation). */
+const version = (f: Versioned) => {
+  const t = f.ctimeMs ?? f.mtimeMs;
+  return t ? Math.round(t) : undefined;
+};
 
-export const fileUrl = (f: FileRef & { mtimeMs?: number }) => `/api/file?${qs({ root: f.root, rel: f.rel, v: f.mtimeMs ? Math.round(f.mtimeMs) : undefined })}`;
+export const thumbUrl = (f: Versioned, size: number) => `/api/thumb?${qs({ root: f.root, rel: f.rel, size, v: version(f) })}`;
+
+export const fileUrl = (f: Versioned) => `/api/file?${qs({ root: f.root, rel: f.rel, v: version(f) })}`;
 
 /** Upload one file to /import with progress (XHR, since fetch has no upload progress). */
 export function uploadFile(file: File, rel: string, onProgress: (fraction: number) => void): Promise<FileRef> {

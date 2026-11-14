@@ -1,4 +1,18 @@
-import { formatExifDate, utcMsToWall, type GpsPoint, type MediaKind, type MediaMeta, type Wall } from '@io/shared';
+import {
+  describeOrientation,
+  describeTurn,
+  formatExifDate,
+  mirrorOrientation,
+  orientationForTurn,
+  orientMethod,
+  rotateOrientation,
+  utcMsToWall,
+  type GpsPoint,
+  type MediaKind,
+  type MediaMeta,
+  type MirrorAxis,
+  type Wall,
+} from '@io/shared';
 import type { TagMap } from './exiftool.js';
 
 /**
@@ -63,4 +77,42 @@ export function clearGpsTags(kind: MediaKind): { tags: TagMap; numeric: boolean 
 /** Tag names an undo snapshot must capture before a GPS write/clear. */
 export function gpsSnapshotTags(kind: MediaKind): string[] {
   return kind === 'photo' ? PHOTO_GPS : VIDEO_GPS;
+}
+
+export type OrientChange = { rotate: number } | { mirror: MirrorAxis };
+
+export type OrientWrite =
+  | { tags: TagMap; snapshot: string[]; meta: MediaMeta; before: string; after: string }
+  | { skip: 'format' | 'mirrorHeif' | 'mirrorVideo' };
+
+/**
+ * Rotate or mirror without touching the pixels (all numeric, -n):
+ * JPEG → EXIF Orientation; HEIF → irot (QuickTime:Rotation, counter-clockwise quarter turns), plus the
+ * EXIF Orientation when present so it keeps matching; video → track matrix (Rotation, clockwise degrees).
+ */
+export function orientTags(name: string, kind: MediaKind, meta: MediaMeta, change: OrientChange): OrientWrite {
+  const method = orientMethod(name, kind);
+  if (!method) return { skip: 'format' };
+  if (method === 'exif') {
+    const next = 'rotate' in change ? rotateOrientation(meta.orientation, change.rotate) : mirrorOrientation(meta.orientation, change.mirror);
+    return {
+      tags: { Orientation: next },
+      snapshot: ['Orientation'],
+      meta: { ...meta, orientation: next },
+      before: describeOrientation(meta.orientation),
+      after: describeOrientation(next),
+    };
+  }
+  if (!('rotate' in change)) return { skip: method === 'heif' ? 'mirrorHeif' : 'mirrorVideo' };
+  const cur = meta.rotation ?? 0;
+  const next = (cur + change.rotate) % 360;
+  const before = describeTurn(cur);
+  const after = describeTurn(next);
+  if (method === 'video') return { tags: { Rotation: next }, snapshot: ['Rotation'], meta: { ...meta, rotation: next }, before, after };
+  const tags: TagMap = { 'QuickTime:Rotation': ((360 - next) % 360) / 90 };
+  const out: MediaMeta = { ...meta, rotation: next };
+  if (meta.orientation !== undefined) {
+    tags.Orientation = out.orientation = orientationForTurn(next);
+  }
+  return { tags, snapshot: Object.keys(tags), meta: out, before, after };
 }

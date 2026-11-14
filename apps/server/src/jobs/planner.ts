@@ -35,7 +35,7 @@ import { dirOfRel, joinRel, nameOfRel, type Roots } from '../fs/roots.js';
 import { HttpError } from '../http/errors.js';
 import { tzForGps, type Indexer } from '../index/indexer.js';
 import { TAG_NAME, type TagMap } from '../metadata/exiftool.js';
-import { applyDateToMeta, clearGpsTags, dateTags, gpsSnapshotTags, gpsTags } from '../metadata/tags.js';
+import { applyDateToMeta, clearGpsTags, dateTags, gpsSnapshotTags, gpsTags, orientTags } from '../metadata/tags.js';
 
 /** Concrete filesystem/metadata operations. Executed in order by the engine. */
 export type Op =
@@ -361,8 +361,31 @@ async function planStep(step: number, s: Step, files: VFile[], plan: Plan, d: Pl
         plan.ops.push({ op: 'heicToJpeg', step, file: { ...v.cur }, to, quality });
         item(v, { before: v.entry.name, after: `${name} (quality ${quality})` });
         setCur(v, to);
+        // The decoder bakes the rotation into the pixels and the JPG gets no Orientation.
+        const { orientation: _o, rotation: _r, ...upright } = v.entry.meta;
+        v.entry = { ...v.entry, meta: upright };
       }
       if (other) plan.warnings.push(`${other} file(s) skipped: not HEIC/HEIF`);
+      return;
+    }
+
+    case 'rotate':
+    case 'mirror': {
+      const change = s.type === 'rotate' ? { rotate: s.degrees } : { mirror: s.axis };
+      const skipped = { format: 0, mirrorHeif: 0, mirrorVideo: 0 };
+      for (const v of files) {
+        const w = orientTags(v.entry.name, v.entry.kind, v.entry.meta, change);
+        if ('skip' in w) {
+          skipped[w.skip]++;
+          continue;
+        }
+        plan.ops.push({ op: 'writeTags', step, file: { ...v.cur }, tags: w.tags, numeric: true, snapshot: w.snapshot });
+        item(v, { before: w.before, after: w.after });
+        v.entry = { ...v.entry, meta: w.meta };
+      }
+      if (skipped.format) plan.warnings.push(`${skipped.format} file(s) skipped: only JPEG, HEIC and videos can be ${s.type === 'rotate' ? 'rotated' : 'mirrored'} without re-encoding`);
+      if (skipped.mirrorHeif) plan.warnings.push(`${skipped.mirrorHeif} HEIC file(s) skipped: HEIC can't be mirrored losslessly; convert to JPG first`);
+      if (skipped.mirrorVideo) plan.warnings.push(`${skipped.mirrorVideo} video(s) skipped: videos can't be mirrored`);
       return;
     }
 

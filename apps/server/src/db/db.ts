@@ -77,6 +77,10 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (root, rel)
   );
   `,
+  // Rotate/mirror: MediaMeta gained rotation (HEIF irot, video matrix); re-read cached files.
+  `
+  DELETE FROM media_cache;
+  `,
 ];
 
 export function openDb(appDir: string): DB {

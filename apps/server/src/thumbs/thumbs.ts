@@ -29,7 +29,8 @@ export class Limit {
 }
 
 /**
- * JPEG thumbnails and previews, cached under /app/cache/thumbs by (path, size, mtime).
+ * JPEG thumbnails and previews, cached under /app/cache/thumbs by (path, size, mtime, ctime). ctime because
+ * tag writes (e.g. a new Orientation) keep mtime and often the file size.
  * Photos: sharp (auto-rotated) → full ffmpeg decode (HEIC) → embedded JPEG. Videos: one ffmpeg frame.
  * Originals are never modified; video preview streams the original file (no transcoding).
  */
@@ -49,7 +50,7 @@ export class Thumbs {
   async get(ref: FileRef, size: number): Promise<string> {
     const { root, rel, abs } = this.roots.resolve(ref);
     const st = await fs.stat(abs);
-    const key = createHash('sha1').update(`${root}\0${rel}\0${size}\0${st.mtimeMs}\0${st.size}`).digest('hex');
+    const key = createHash('sha1').update(`${root}\0${rel}\0${size}\0${st.mtimeMs}\0${st.ctimeMs}\0${st.size}`).digest('hex');
     const out = path.join(this.dir, key.slice(0, 2), `${key}.jpg`);
     try {
       await fs.access(out);

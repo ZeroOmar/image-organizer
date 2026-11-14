@@ -1,4 +1,4 @@
-import { DATE_SOURCES, ISSUE_CHECKS, extOf, type EnrichedEntry } from '@io/shared';
+import { DATE_SOURCES, ISSUE_CHECKS, displaySize, extOf, type EnrichedEntry } from '@io/shared';
 
 /** Facets are computed client-side from the folder listing (libraries are < 10k files). */
 export interface FacetDef {
@@ -35,10 +35,9 @@ export const FACETS: FacetDef[] = [
     id: 'orientation',
     label: 'Orientation',
     keys: (e) => {
-      const { width: w, height: h, orientation: o } = e.meta;
-      if (!w || !h) return ['unknown'];
-      const rotated = o !== undefined && o >= 5 && o <= 8;
-      const [W, H] = rotated ? [h, w] : [w, h];
+      const size = displaySize(e.meta);
+      if (!size) return ['unknown'];
+      const { width: W, height: H } = size;
       return [W === H ? 'square' : W > H ? 'landscape' : 'portrait'];
     },
   },

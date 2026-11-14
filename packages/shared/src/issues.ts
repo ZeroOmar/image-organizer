@@ -1,9 +1,10 @@
 import { dateCandidates, parseOffset, type ResolvedDate } from './dates.js';
-import type { MediaEntry } from './media.js';
+import { isHeif, type MediaEntry } from './media.js';
+import { isFrontCamera, isMirroredOrientation } from './orientation.js';
 import type { IssueCheckId, Settings } from './settings.js';
 import { matchesTemplate, renderContext } from './template.js';
 
-export type IssueCategory = 'missing' | 'mismatch' | 'name';
+export type IssueCategory = 'missing' | 'mismatch' | 'name' | 'orientation';
 
 export interface Issue {
   id: IssueCheckId;
@@ -100,6 +101,19 @@ export const ISSUE_CHECKS: IssueCheck[] = [
       const ctx = renderContext({ ...entry, folder, make: entry.meta.make, model: entry.meta.model }, resolved, settings);
       return matchesTemplate(entry.name, entry.kind, ctx, settings) ? null : 'File name doesn’t follow the rename template';
     },
+  },
+  {
+    // Phones can't record whether a selfie was saved mirrored, so this flags every front-camera photo
+    // not mirrored yet. Mirroring sets a mirrored EXIF Orientation, which clears it.
+    id: 'frontCamera',
+    label: 'Selfie, may be mirrored',
+    category: 'orientation',
+    check: ({ entry }) =>
+      entry.kind === 'photo' && isFrontCamera(entry.meta) && !isMirroredOrientation(entry.meta.orientation)
+        ? isHeif(entry.name)
+          ? 'Front-camera photo: check whether it is mirrored (HEIC is converted to JPG to mirror it)'
+          : 'Front-camera photo: check whether it is mirrored'
+        : null,
   },
 ];
 

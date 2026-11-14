@@ -289,6 +289,98 @@ describe('jobs', () => {
     expect(fs.existsSync(jpg)).toBe(false);
   });
 
+  const thumbSize = async (rel: string) => {
+    const res = await app.inject({ method: 'GET', url: `/api/thumb?root=media&rel=${encodeURIComponent(rel)}&size=128`, headers: { cookie } });
+    expect(res.statusCode, rel).toBe(200);
+    const m = await sharp(res.rawPayload).metadata();
+    return `${m.width}x${m.height}`;
+  };
+  const undo = async (job: JobInfo) => expect((await waitJob((await api<JobInfo>('POST', `/api/jobs/${job.id}/undo`)).id)).errors).toEqual([]);
+
+  it('rotates a JPEG via EXIF Orientation keeping mtime, refreshes the thumbnail, then undoes', async () => {
+    const rel = 'Trips/Bikers/IMG_0001.jpg';
+    const file = media(rel);
+    const mtime = fs.statSync(file).mtimeMs;
+    expect(exif(file, 'Orientation').Orientation).toBeUndefined();
+    expect(await thumbSize(rel)).toBe('128x96');
+
+    const req: JobRequest = { selection: { files: [{ root: 'media', rel }] }, steps: [{ type: 'rotate', degrees: 90 }, { type: 'rotate', degrees: 90 }, { type: 'rotate', degrees: 270 }] };
+    const plan = await api<PlanResult>('POST', '/api/jobs/plan', req);
+    expect(plan.items.map((i) => `${i.before} → ${i.after}`)).toEqual([
+      'Normal → Rotated 90° right',
+      'Rotated 90° right → Rotated 180°',
+      'Rotated 180° → Rotated 90° right',
+    ]);
+    const job = await runJob(req);
+    expect(job.errors).toEqual([]);
+    expect(exif(file, 'Orientation').Orientation).toBe(6);
+    expect(fs.statSync(file).mtimeMs).toBe(mtime);
+    // Same path, mtime and (often) size as before: the cache key must still change.
+    expect(await thumbSize(rel)).toBe('96x128');
+    const l = await api<FolderListing>('GET', '/api/folder?root=media&rel=Trips/Bikers');
+    expect(l.entries.find((e) => e.name === 'IMG_0001.jpg')?.meta.orientation).toBe(6);
+
+    await undo(job);
+    expect(exif(file, 'Orientation').Orientation).toBeUndefined();
+    expect(await thumbSize(rel)).toBe('128x96');
+  });
+
+  it('mirrors a selfie with no EXIF and clears the front-camera issue, then undoes', async () => {
+    const rel = 'Trips/Bikers/IMG-20261008-WA0001.jpeg';
+    const file = media(rel);
+    const sel = { files: [{ root: 'media' as const, rel }] };
+    const issues = async () =>
+      (await api<FolderListing>('GET', '/api/folder?root=media&rel=Trips/Bikers')).entries.find((e) => e.rel === rel)!.issues.map((i) => i.id);
+    const lens = await runJob({ selection: sel, steps: [{ type: 'editTags', tags: { LensModel: 'iPhone 15 front camera 2.69mm f/1.9' } }] });
+    expect(await issues()).toContain('frontCamera');
+
+    const job = await runJob({ selection: sel, steps: [{ type: 'mirror', axis: 'horizontal' }] });
+    expect(job.errors).toEqual([]);
+    expect(exif(file, 'Orientation').Orientation).toBe(2);
+    expect(await issues()).not.toContain('frontCamera');
+
+    await undo(job);
+    expect(exif(file, 'Orientation').Orientation).toBeUndefined();
+    await undo(lens);
+    expect(await issues()).not.toContain('frontCamera');
+  });
+
+  it('rotates HEIC via irot and videos via the track matrix; mirroring skips both', async () => {
+    const sel = { files: [{ root: 'media' as const, rel: 'Family/IMG_2001.HEIC' }, { root: 'media' as const, rel: 'Trips/Bikers/clip.mp4' }] };
+    const mirror = await api<PlanResult>('POST', '/api/jobs/plan', { selection: sel, steps: [{ type: 'mirror', axis: 'horizontal' }] });
+    expect(mirror.items).toEqual([]);
+    expect(mirror.warnings).toEqual([
+      "1 HEIC file(s) skipped: HEIC can't be mirrored losslessly; convert to JPG first",
+      "1 video(s) skipped: videos can't be mirrored",
+    ]);
+
+    const job = await runJob({ selection: sel, steps: [{ type: 'rotate', degrees: 90 }] });
+    expect(job.errors).toEqual([]);
+    expect(exif(media('Family/IMG_2001.HEIC'), 'QuickTime:Rotation').Rotation).toBe(3);
+    expect(exif(media('Trips/Bikers/clip.mp4'), 'Rotation').Rotation).toBe(90);
+    expect(await thumbSize('Family/IMG_2001.HEIC')).toBe('96x128');
+    expect(await thumbSize('Trips/Bikers/clip.mp4')).toBe('96x128');
+    const l = await api<FolderListing>('GET', '/api/folder?root=media&rel=Family');
+    expect(l.entries.find((e) => e.name === 'IMG_2001.HEIC')?.meta.rotation).toBe(90);
+
+    await undo(job);
+    expect(exif(media('Family/IMG_2001.HEIC'), 'QuickTime:Rotation').Rotation).toBe(0);
+    expect(exif(media('Trips/Bikers/clip.mp4'), 'Rotation').Rotation).toBe(0);
+  });
+
+  it('mirrors HEIC by converting it to JPG first in the same job, then undoes', async () => {
+    const heic = media('Family/IMG_2001.HEIC');
+    const job = await runJob({
+      selection: { files: [{ root: 'media', rel: 'Family/IMG_2001.HEIC' }] },
+      steps: [{ type: 'heicToJpeg' }, { type: 'mirror', axis: 'horizontal' }],
+    });
+    expect(job.errors).toEqual([]);
+    expect(exif(media('Family/IMG_2001.jpg'), 'Orientation').Orientation).toBe(2);
+    await undo(job);
+    expect(fs.existsSync(heic)).toBe(true);
+    expect(fs.existsSync(media('Family/IMG_2001.jpg'))).toBe(false);
+  });
+
   it('imports into an album with dates + rename', async () => {
     await api('POST', '/api/folders', { root: 'media', rel: '', name: 'Album' });
     const job = await runJob({

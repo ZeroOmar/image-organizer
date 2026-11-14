@@ -72,7 +72,7 @@ export class Indexer {
         )
         .run(root, rel, st.size, st.mtimeMs, JSON.stringify(meta), metaError ?? null);
     }
-    return { root, rel, name, kind, size: st.size, mtimeMs: st.mtimeMs, meta, metaError, gpsTz: tzForGps(meta.gps) };
+    return { root, rel, name, kind, size: st.size, mtimeMs: st.mtimeMs, ctimeMs: st.ctimeMs, meta, metaError, gpsTz: tzForGps(meta.gps) };
   }
 
   /** Read many files; ExifTool's process pool bounds the real concurrency. */

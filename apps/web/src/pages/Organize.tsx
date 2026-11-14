@@ -6,11 +6,12 @@ import { CopyMetadataDialog } from '../organize/dialogs/CopyMetadataDialog';
 import { DatesDialog } from '../organize/dialogs/DatesDialog';
 import { GpsDialog } from '../organize/dialogs/GpsDialog';
 import { HeicToJpegDialog } from '../organize/dialogs/HeicToJpegDialog';
+import { OrientDialog } from '../organize/dialogs/OrientDialog';
 import { RenameDialog } from '../organize/dialogs/RenameDialog';
 import { EditTagsDialog, MoveDialog, SyncDatesDialog, TrashDialog } from '../organize/dialogs/SimpleDialogs';
 import { actionButtons, Workspace, type BatchAction, type WorkspaceApi } from '../organize/Workspace';
 
-type DialogId = 'rename' | 'dates' | 'gps' | 'copy' | 'tags' | 'sync' | 'convert' | 'heicToJpeg' | 'move' | 'trash';
+type DialogId = 'rename' | 'dates' | 'gps' | 'copy' | 'tags' | 'sync' | 'orient' | 'convert' | 'heicToJpeg' | 'move' | 'trash';
 
 export function OrganizePage() {
   const [dialog, setDialog] = useState<DialogId | null>(null);
@@ -28,6 +29,7 @@ export function OrganizePage() {
       a('copy', 'Copy metadata', { min: 2 }),
       a('tags', 'Edit tags'),
       a('sync', 'Sync file dates'),
+      a('orient', 'Rotate & mirror'),
       ...(convertAvailable ? [a('convert', 'Convert to HEVC', { disabled: !w.selected.some((e) => e.kind === 'video') })] : []),
       a('heicToJpeg', 'HEIC to JPG', { disabled: !w.selected.some((e) => isHeif(e.name)) }),
       a('move', 'Move'),
@@ -77,6 +79,8 @@ function Dialogs({ id, w, onClose }: { id: DialogId; w: WorkspaceApi; onClose: (
       return <EditTagsDialog selection={w.selection} focused={w.focused} onClose={onClose} />;
     case 'sync':
       return <SyncDatesDialog selection={w.selection} onClose={onClose} />;
+    case 'orient':
+      return <OrientDialog selection={w.selection} heicCount={w.selected.filter((e) => isHeif(e.name)).length} onClose={onClose} />;
     case 'convert':
       return <ConvertDialog selection={w.selection} count={w.selected.filter((e) => e.kind === 'video').length} onClose={onClose} />;
     case 'heicToJpeg':

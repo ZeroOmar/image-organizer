@@ -7,3 +7,4 @@ export * from './api.js';
 export * from './convert.js';
 export * from './dupes.js';
 export * from './folders.js';
+export * from './orientation.js';

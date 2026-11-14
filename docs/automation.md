@@ -34,6 +34,8 @@ Steps are shared with the batch bar. `STEP_INFO` marks which ones the rule edito
 | `move` | `dest` | |
 | `moveByDate` | `pattern` e.g. `{YYYY}/{YYYY}-{MM}` | into `/media` |
 | `trash` | — | UI only |
+| `rotate` | `degrees: 90\|180\|270` (clockwise) | UI only (**Rotate & mirror**): lossless, through the orientation tag (JPEG EXIF Orientation, HEIC irot, video matrix); other formats are skipped with a warning ([metadata-and-dates.md](metadata-and-dates.md#writing-appsserversrcmetadatatagsts)) |
+| `mirror` | `axis: horizontal\|vertical` | UI only: lossless EXIF Orientation flip, JPEG only; HEIC and videos are skipped with a warning (the dialog can prepend `heicToJpeg`) |
 | `convert` | `crf?`, `preset?` | re-encode videos to HEVC; unset params use Settings → Conversion; runs on the convert lane; originals go to the trash ([convert.md](convert.md)) |
 | `heicToJpeg` | `quality?` | save HEIC/HEIF photos as `<name>.jpg` (taken names get `_1`…), all metadata kept; unset quality uses Settings → Conversion; other files are skipped with a warning; originals go to the trash ([convert.md](convert.md#heic-to-jpg)) |
 
