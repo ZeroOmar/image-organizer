@@ -1,9 +1,9 @@
 import type { EnrichedEntry, FileRef, RootName } from '@io/shared';
 import type L from 'leaflet';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ActionDialog } from '../components/ActionDialog';
-import { FileList } from '../gps/FileList';
+import { FileList, showFiles, type Show } from '../gps/FileList';
 import { GpsMap, ZoomSlider } from '../gps/GpsMap';
 import { GpsDialog } from '../organize/dialogs/GpsDialog';
 import { actionButtons, Workspace, type BatchAction, type WorkspaceApi } from '../organize/Workspace';
@@ -17,6 +17,8 @@ export function GpsPage() {
   const [dialog, setDialog] = useState<DialogId | null>(null);
   const [map, setMap] = useState<L.Map | null>(null);
   const [gpsFor, setGpsFor] = useState<{ files: FileRef[]; focused: EnrichedEntry } | null>(null);
+  const [show, setShow] = useState<Show>('all');
+  const scope = useCallback((visible: EnrichedEntry[]) => showFiles(visible, show), [show]);
   const close = () => setDialog(null);
 
   const actions = (): BatchAction[] => [
@@ -65,7 +67,13 @@ export function GpsPage() {
       folderTools={rootSwitch}
       batchBar={bar}
       actions={actions}
-      sidePane={{ label: 'Files', render: (w) => <FileList api={w} />, selectionTools: true, dock: true }}
+      sidePane={{
+        label: 'Files',
+        render: (w) => <FileList api={w} show={show} onShow={setShow} />,
+        selectionTools: true,
+        dock: true,
+        scope,
+      }}
       content={(w) => <GpsMap api={w} onMap={setMap} />}
       statusTools={<ZoomSlider map={map} />}
       emptyText="This folder has no photos or videos."

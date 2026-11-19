@@ -126,7 +126,9 @@ export function CopyMetadataDialog({
                         <input type="radio" name="copy-source" checked={isSrc} onChange={() => setSource(e.rel)} />
                         <img src={thumbUrl(e, 320)} alt="" loading="lazy" />
                         <span>
-                          <span className="compare-name">{e.name}</span>
+                          <span className="compare-name" title={e.name}>
+                            {e.name}
+                          </span>
                           <span className="caption muted">{isSrc ? 'Source' : 'Target'}</span>
                         </span>
                       </label>

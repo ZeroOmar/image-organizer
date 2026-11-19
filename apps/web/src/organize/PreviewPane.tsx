@@ -1,7 +1,14 @@
 import type { EnrichedEntry } from '@io/shared';
+import type { MouseEvent } from 'react';
 import { fileUrl, thumbUrl } from '../api/client';
 
 const STACK_MAX = 5;
+
+/** A single photo goes full screen on click (videos have the player's own button); click or Esc leaves. */
+function toggleFullscreen(e: MouseEvent<HTMLImageElement>) {
+  if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+  else void e.currentTarget.requestFullscreen?.().catch(() => {});
+}
 
 /**
  * One file: images are shown as-is (HEIC via server JPEG preview); videos stream the original with range requests.
@@ -43,7 +50,7 @@ export function PreviewPane({ entry, selected = [] }: { entry: EnrichedEntry | n
       {entry.kind === 'video' ? (
         <video key={entry.rel} src={fileUrl(entry)} controls preload="metadata" />
       ) : (
-        <img key={entry.rel} src={fileUrl(entry)} alt={entry.name} />
+        <img key={entry.rel} src={fileUrl(entry)} alt={entry.name} title="Click for full screen" onClick={toggleFullscreen} />
       )}
       <div className="caption muted" style={{ textAlign: 'center', overflowWrap: 'anywhere' }}>
         {entry.name}

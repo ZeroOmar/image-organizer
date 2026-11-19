@@ -1,5 +1,5 @@
-import { formatDisplay } from '@io/shared';
-import { useEffect, useRef, useState } from 'react';
+import { formatDisplay, type EnrichedEntry } from '@io/shared';
+import { useEffect, useRef } from 'react';
 import { thumbUrl } from '../api/client';
 import { SelectCheck } from '../organize/SelectCheck';
 import type { WorkspaceApi } from '../organize/Workspace';
@@ -7,15 +7,17 @@ import type { WorkspaceApi } from '../organize/Workspace';
 /** dataTransfer type for dragging a list row onto the map. */
 export const REL_MIME = 'application/x-io-rel';
 
-type Show = 'all' | 'none' | 'gps';
+export type Show = 'all' | 'none' | 'gps';
+
+/** The files a tab lists; the GPS page also hands this to the Workspace so Select all matches the tab. */
+export const showFiles = (entries: EnrichedEntry[], show: Show) => entries.filter((e) => show === 'all' || (show === 'gps') === !!e.meta.gps);
 
 /** The GPS page's side pane: the folder's files with their GPS status. Rows click-select and drag onto the map. */
-export function FileList({ api }: { api: WorkspaceApi }) {
-  const [show, setShow] = useState<Show>('all');
+export function FileList({ api, show, onShow }: { api: WorkspaceApi; show: Show; onShow: (s: Show) => void }) {
   const list = useRef<HTMLDivElement>(null);
   const withGps = api.visible.filter((e) => e.meta.gps).length;
   const counts: Record<Show, number> = { all: api.visible.length, gps: withGps, none: api.visible.length - withGps };
-  const rows = api.visible.filter((e) => show === 'all' || (show === 'gps') === !!e.meta.gps);
+  const rows = showFiles(api.visible, show);
   const focusedRel = api.focused?.rel;
 
   // Keep the focused file in view, e.g. after picking its marker on the map.
@@ -34,7 +36,7 @@ export function FileList({ api }: { api: WorkspaceApi }) {
               ['gps', 'With GPS'],
             ] as const
           ).map(([k, label]) => (
-            <button key={k} role="tab" className={show === k ? 'active' : ''} onClick={() => setShow(k)}>
+            <button key={k} role="tab" className={show === k ? 'active' : ''} onClick={() => onShow(k)}>
               {label} <span className="subtle">{counts[k]}</span>
             </button>
           ))}

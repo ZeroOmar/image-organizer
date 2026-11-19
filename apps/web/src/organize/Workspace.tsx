@@ -167,8 +167,15 @@ export function Workspace({
    * Replaces the Filter pane under the folder tree. `selectionTools` moves Select all / Clear into its header.
    * `dock`: on phones, show it as a resizable panel under the content (e.g. the GPS file list next to the map)
    * instead of a bottom sheet behind a button.
+   * `scope`: the files the pane lists (e.g. the GPS list's No GPS tab); Select all and shift-range use them.
    */
-  sidePane?: { label: string; render: (api: WorkspaceApi) => ReactNode; selectionTools?: boolean; dock?: boolean };
+  sidePane?: {
+    label: string;
+    render: (api: WorkspaceApi) => ReactNode;
+    selectionTools?: boolean;
+    dock?: boolean;
+    scope?: (visible: EnrichedEntry[]) => EnrichedEntry[];
+  };
   /** Replaces the thumbnail Size slider at the right of the status bar. */
   statusTools?: ReactNode;
 }) {
@@ -236,7 +243,12 @@ export function Workspace({
   const issueCount = entries.filter((e) => e.issues.length).length;
   const highlight = settings?.issues.enabled ?? true;
 
-  const order = useMemo(() => visible.map((e) => e.rel), [visible]);
+  // What Select all and shift-range act on: the visible files, narrowed by the side pane's own tabs if it has any.
+  const scopeFn = sidePane?.scope;
+  const selectable = useMemo(() => (scopeFn ? scopeFn(visible) : visible), [scopeFn, visible]);
+  const allSelected = selectable.every((e) => selection.has(e.rel));
+  const selectAll = () => setSelection(new Set(selectable.map((e) => e.rel)));
+  const order = useMemo(() => selectable.map((e) => e.rel), [selectable]);
   const { pick, selectRange, anchor } = useSelectClick({ order, selection, onSelection: setSelection, onFocus: setFocusedRel });
 
   const go = (rel: string) => {
@@ -377,7 +389,7 @@ export function Workspace({
       disabled: a.disabled || selected.length < (a.min ?? 1),
       danger: a.variant === 'danger',
     })),
-    { label: 'Select all', onSelect: () => setSelection(new Set(visible.map((e) => e.rel))), separator: true },
+    { label: 'Select all', onSelect: selectAll, separator: true },
     ...(req.selectRange ? [{ label: 'Select range to here', onSelect: req.selectRange }] : []),
     { label: 'Clear selection', onSelect: () => setSelection(new Set()), disabled: selection.size === 0 },
   ];
@@ -392,8 +404,8 @@ export function Workspace({
     <div className="select-tools">
       <button
         className="btn btn-ghost btn-sm"
-        disabled={visible.length === 0 || selected.length === visible.length}
-        onClick={() => setSelection(new Set(visible.map((e) => e.rel)))}
+        disabled={selectable.length === 0 || allSelected}
+        onClick={selectAll}
       >
         Select all
       </button>
@@ -514,8 +526,8 @@ export function Workspace({
               <span className="m-count grow">{selected.length ? `${selected.length} selected` : 'Tap files to select'}</span>
               <button
                 className="btn btn-ghost btn-sm"
-                disabled={visible.length === 0 || selected.length === visible.length}
-                onClick={() => setSelection(new Set(visible.map((e) => e.rel)))}
+                disabled={selectable.length === 0 || allSelected}
+                onClick={selectAll}
               >
                 All
               </button>
